@@ -9,6 +9,22 @@ class IntroScene extends Phaser.Scene {
     create() {
         this.gameWidth = this.sys.game.config.width;
         this.gameHeight = this.sys.game.config.height;
+        
+        // Ship customization defaults
+        this.selectedShape = 0;
+        this.selectedColor = 4; // Blue by default
+        this.selectedEngineColor = 1; // Orange by default
+
+        // Colors array
+        this.colors = [
+            { name: 'Red', hex: 0xFF0000, css: '#ff0000' },
+            { name: 'Orange', hex: 0xFFA500, css: '#ffa500' },
+            { name: 'Yellow', hex: 0xFFFF00, css: '#ffff00' },
+            { name: 'Green', hex: 0x00FF00, css: '#00ff00' },
+            { name: 'Blue', hex: 0x0066FF, css: '#0066ff' },
+            { name: 'Indigo', hex: 0x4B0082, css: '#4b0082' },
+            { name: 'Violet', hex: 0x8B00FF, css: '#8b00ff' }
+        ];
 
         // Background
         this.add.rectangle(this.gameWidth / 2, this.gameHeight / 2, this.gameWidth, this.gameHeight, 0x000011);
@@ -24,8 +40,8 @@ class IntroScene extends Phaser.Scene {
         }
 
         // Title
-        const titleText = this.add.text(this.gameWidth / 2, 150, 'SPACE GAME', {
-            fontSize: '72px',
+        const titleText = this.add.text(this.gameWidth / 2, 40, 'SPACE GAME', {
+            fontSize: '56px',
             fill: '#00ffff',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -40,38 +56,230 @@ class IntroScene extends Phaser.Scene {
             repeat: -1
         });
 
-        // Subtitle
-        this.add.text(this.gameWidth / 2, 220, 'Choose Your Difficulty', {
-            fontSize: '24px',
+        // ===== SINGLE PREVIEW BOX =====
+        const boxX = this.gameWidth / 2;
+        const boxY = 240;
+        const boxSize = 100;
+        const arrowSpacing = 50;
+        const shipScale = 2.5;
+        
+        // Main preview box
+        this.add.rectangle(boxX, boxY, boxSize, boxSize, 0x222233).setStrokeStyle(3, 0x444455);
+        
+        // Ship preview graphics - offset to center it (origin is top-left of 32x32, so offset by half scaled size)
+        this.shipPreview = this.add.graphics();
+        this.shipPreview.setPosition(boxX - 16 * shipScale, boxY - 16 * shipScale);
+        this.shipPreview.setScale(shipScale);
+        
+        // ===== ROW 1: SHAPE ARROWS (top) =====
+        const row1Y = boxY - arrowSpacing;
+        
+        // Label on far left
+        this.add.text(boxX - boxSize/2 - 160, row1Y, 'Shape', {
+            fontSize: '18px',
+            fill: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0, 0.5);
+        
+        // Left arrow (left side of box)
+        const leftShapeArrow = this.add.text(boxX - boxSize/2 - 30, row1Y, '<', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        // Right arrow (right side of box)
+        const rightShapeArrow = this.add.text(boxX + boxSize/2 + 30, row1Y, '>', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        leftShapeArrow.on('pointerdown', () => {
+            this.selectedShape = (this.selectedShape - 1 + 5) % 5;
+            this.updateShipPreview();
+        });
+        
+        rightShapeArrow.on('pointerdown', () => {
+            this.selectedShape = (this.selectedShape + 1) % 5;
+            this.updateShipPreview();
+        });
+
+        // ===== ROW 2: SHIP COLOR ARROWS (middle) =====
+        const row2Y = boxY;
+        
+        // Label on far left
+        this.add.text(boxX - boxSize/2 - 160, row2Y, 'Ship Color', {
+            fontSize: '18px',
+            fill: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0, 0.5);
+        
+        // Left arrow (left side of box)
+        const leftColorArrow = this.add.text(boxX - boxSize/2 - 30, row2Y, '<', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        // Right arrow (right side of box)
+        const rightColorArrow = this.add.text(boxX + boxSize/2 + 30, row2Y, '>', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        leftColorArrow.on('pointerdown', () => {
+            this.selectedColor = (this.selectedColor - 1 + 7) % 7;
+            this.updateShipPreview();
+        });
+        
+        rightColorArrow.on('pointerdown', () => {
+            this.selectedColor = (this.selectedColor + 1) % 7;
+            this.updateShipPreview();
+        });
+
+        // ===== ROW 3: ENGINE COLOR ARROWS (bottom) =====
+        const row3Y = boxY + arrowSpacing;
+        
+        // Label on far left
+        this.add.text(boxX - boxSize/2 - 160, row3Y, 'Engine Color', {
+            fontSize: '18px',
+            fill: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0, 0.5);
+        
+        // Left arrow (left side of box)
+        const leftEngineArrow = this.add.text(boxX - boxSize/2 - 30, row3Y, '<', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        // Right arrow (right side of box)
+        const rightEngineArrow = this.add.text(boxX + boxSize/2 + 30, row3Y, '>', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        
+        leftEngineArrow.on('pointerdown', () => {
+            this.selectedEngineColor = (this.selectedEngineColor - 1 + 7) % 7;
+            this.updateShipPreview();
+        });
+        
+        rightEngineArrow.on('pointerdown', () => {
+            this.selectedEngineColor = (this.selectedEngineColor + 1) % 7;
+            this.updateShipPreview();
+        });
+
+        // ===== DIFFICULTY SELECTION =====
+        this.add.text(this.gameWidth / 2, 480, 'Select Difficulty', {
+            fontSize: '20px',
             fill: '#aaaaaa',
             fontFamily: 'Arial'
         }).setOrigin(0.5);
 
         // Normal Mode Button
-        const normalButton = this.createButton(this.gameWidth / 2 - 150, 380, 'Normal Mode', 0x00aa00, () => {
+        const normalButton = this.createButton(this.gameWidth / 2 - 150, 530, 'Normal Mode', 0x00aa00, () => {
             this.startGame('normal');
         });
 
         // Hard Mode Button
-        const hardButton = this.createButton(this.gameWidth / 2 + 150, 380, 'Hard Mode', 0xaa0000, () => {
+        const hardButton = this.createButton(this.gameWidth / 2 + 150, 530, 'Hard Mode', 0xaa0000, () => {
             this.startGame('hard');
         });
 
         // Normal Mode Description
-        this.add.text(this.gameWidth / 2 - 150, 460, 'Standard gameplay\nNo limits', {
-            fontSize: '16px',
+        this.add.text(this.gameWidth / 2 - 150, 580, 'Standard gameplay\nNo limits', {
+            fontSize: '14px',
             fill: '#888888',
             fontFamily: 'Arial',
             align: 'center'
         }).setOrigin(0.5);
 
         // Hard Mode Description
-        this.add.text(this.gameWidth / 2 + 150, 460, 'Faster enemy scaling\nLimited upgrades', {
-            fontSize: '16px',
+        this.add.text(this.gameWidth / 2 + 150, 580, 'Faster enemy scaling\nLimited upgrades', {
+            fontSize: '14px',
             fill: '#888888',
             fontFamily: 'Arial',
             align: 'center'
         }).setOrigin(0.5);
+        
+        // Initial preview update
+        this.updateShipPreview();
+    }
+
+    updateShipPreview() {
+        this.shipPreview.clear();
+        this.drawShipPreview(this.shipPreview, this.selectedShape, this.colors[this.selectedColor].hex, this.colors[this.selectedEngineColor].hex);
+    }
+
+    drawShipPreview(graphics, shapeIndex, shipColor, engineColor) {
+        graphics.clear();
+        
+        // Draw ship outline
+        graphics.lineStyle(2, 0xffffff, 1);
+        
+        // Draw ship body based on shape
+        graphics.fillStyle(shipColor, 1);
+        
+        switch(shapeIndex) {
+            case 0: // Triangle (original)
+                graphics.beginPath();
+                graphics.moveTo(16, 2);
+                graphics.lineTo(30, 30);
+                graphics.lineTo(16, 24);
+                graphics.lineTo(2, 30);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 1: // Wide fighter jet
+                graphics.beginPath();
+                graphics.moveTo(16, 2);
+                graphics.lineTo(30, 26);
+                graphics.lineTo(28, 30);
+                graphics.lineTo(4, 30);
+                graphics.lineTo(2, 26);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 2: // Cross fighter
+                graphics.beginPath();
+                graphics.moveTo(16, 2);
+                graphics.lineTo(24, 12);
+                graphics.lineTo(32, 16);
+                graphics.lineTo(24, 20);
+                graphics.lineTo(16, 30);
+                graphics.lineTo(8, 20);
+                graphics.lineTo(0, 16);
+                graphics.lineTo(8, 12);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 3: // Rounded sci-fi
+                graphics.fillStyle(shipColor, 1);
+                graphics.fillCircle(16, 16, 14);
+                graphics.lineStyle(2, 0xffffff, 1);
+                graphics.strokeCircle(16, 16, 14);
+                break;
+            case 4: // Diamond ship
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(26, 16);
+                graphics.lineTo(16, 32);
+                graphics.lineTo(6, 16);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+        }
+        
+        // Draw cockpit
+        graphics.fillStyle(0x88ccff, 1);
+        graphics.fillCircle(16, 14, 5);
+        
+        // Draw engine glow
+        graphics.fillStyle(engineColor, 1);
+        graphics.fillCircle(11, 26, 3);
+        graphics.fillCircle(21, 26, 3);
     }
 
     createButton(x, y, text, color, callback) {
@@ -111,7 +319,12 @@ class IntroScene extends Phaser.Scene {
     startGame(mode) {
         this.cameras.main.fade(500, 0, 0, 0);
         this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { gameMode: mode });
+            this.scene.start('GameScene', { 
+                gameMode: mode,
+                shipShape: this.selectedShape,
+                shipColor: this.colors[this.selectedColor].hex,
+                engineColor: this.colors[this.selectedEngineColor].hex
+            });
         });
     }
 
@@ -139,7 +352,13 @@ class BootScene extends Phaser.Scene {
         this.createAsteroidTexture();
         this.createEnemyTexture();
         this.createEliteEnemyTexture();
+        this.createDarkRedEnemyTexture();
+        this.createPulsingRedEnemyTexture();
+        this.createDarkPurpleEnemyTexture();
+        this.createPulsingPurpleEnemyTexture();
         this.createBossTexture();
+        this.createDarkBossTexture();
+        this.createPulsingBossTexture();
         this.createBulletTexture();
         this.createEnemyBulletTexture();
         this.createPowerupShieldTexture();
@@ -309,6 +528,100 @@ class BootScene extends Phaser.Scene {
         graphics.generateTexture('eliteEnemy', 40, 40);
     }
 
+    createDarkRedEnemyTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw dark red enemy ship with white outline
+        graphics.lineStyle(2, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(16, 32);
+        graphics.lineTo(32, 0);
+        graphics.lineTo(16, 8);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0xaa0000, 1);
+        graphics.fillPath();
+        
+        // Draw engine glow
+        graphics.fillStyle(0xff0000, 1);
+        graphics.fillCircle(8, 4, 2);
+        graphics.fillCircle(24, 4, 2);
+        
+        graphics.generateTexture('enemyDarkRed', 32, 32);
+    }
+
+    createPulsingRedEnemyTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw pulsing red enemy ship with thicker white outline
+        graphics.lineStyle(3, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(16, 32);
+        graphics.lineTo(32, 0);
+        graphics.lineTo(16, 8);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0xaa0000, 1);
+        graphics.fillPath();
+        
+        // Draw engine glow
+        graphics.fillStyle(0xff0000, 1);
+        graphics.fillCircle(8, 4, 2);
+        graphics.fillCircle(24, 4, 2);
+        
+        graphics.generateTexture('enemyPulsingRed', 32, 32);
+    }
+
+    createDarkPurpleEnemyTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw dark purple elite enemy ship with white outline
+        graphics.lineStyle(2, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(20, 40);
+        graphics.lineTo(40, 0);
+        graphics.lineTo(20, 10);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0x660099, 1);
+        graphics.fillPath();
+        
+        // Draw wing details
+        graphics.fillStyle(0x440066, 1);
+        graphics.fillRect(15, 15, 10, 20);
+        
+        graphics.generateTexture('enemyDarkPurple', 40, 40);
+    }
+
+    createPulsingPurpleEnemyTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw pulsing purple elite enemy ship with thicker white outline
+        graphics.lineStyle(3, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(20, 40);
+        graphics.lineTo(40, 0);
+        graphics.lineTo(20, 10);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0x660099, 1);
+        graphics.fillPath();
+        
+        // Draw wing details
+        graphics.fillStyle(0x440066, 1);
+        graphics.fillRect(15, 15, 10, 20);
+        
+        graphics.generateTexture('enemyPulsingPurple', 40, 40);
+    }
+
     createBossTexture() {
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
         
@@ -332,6 +645,62 @@ class BootScene extends Phaser.Scene {
         graphics.fillCircle(40, 40, 15);
         
         graphics.generateTexture('boss', 80, 80);
+    }
+
+    createDarkBossTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw dark boss ship (massive, darker shade) with white outline
+        graphics.lineStyle(3, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(40, 80);
+        graphics.lineTo(80, 0);
+        graphics.lineTo(40, 20);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0x333333, 1);
+        graphics.fillPath();
+        
+        // Draw cannons
+        graphics.fillStyle(0x222222, 1);
+        graphics.fillRect(10, 30, 15, 40);
+        graphics.fillRect(55, 30, 15, 40);
+        
+        // Draw core (darker red)
+        graphics.fillStyle(0xaa0000, 1);
+        graphics.fillCircle(40, 40, 15);
+        
+        graphics.generateTexture('bossDark', 80, 80);
+    }
+
+    createPulsingBossTexture() {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw pulsing boss ship (massive, same as dark boss) with thicker white outline
+        graphics.lineStyle(4, 0xffffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(40, 80);
+        graphics.lineTo(80, 0);
+        graphics.lineTo(40, 20);
+        graphics.lineTo(0, 0);
+        graphics.closePath();
+        graphics.strokePath();
+        
+        graphics.fillStyle(0x333333, 1);
+        graphics.fillPath();
+        
+        // Draw cannons
+        graphics.fillStyle(0x222222, 1);
+        graphics.fillRect(10, 30, 15, 40);
+        graphics.fillRect(55, 30, 15, 40);
+        
+        // Draw core (darker red)
+        graphics.fillStyle(0xaa0000, 1);
+        graphics.fillCircle(40, 40, 15);
+        
+        graphics.generateTexture('bossPulsing', 80, 80);
     }
 
     createBulletTexture() {
@@ -761,6 +1130,9 @@ class GameScene extends Phaser.Scene {
 
     init(data) {
         this.gameMode = data.gameMode || 'normal';
+        this.shipShape = data.shipShape || 0;
+        this.shipColor = data.shipColor || 0x00aaff;
+        this.engineColor = data.engineColor || 0xff6600;
         this.score = 0;
         this.health = 100;
         this.maxHealth = 100;
@@ -770,6 +1142,7 @@ class GameScene extends Phaser.Scene {
         this.godMode = false;
         this.isGameOver = false;
         this.isPaused = false;
+        this.pauseText = null;
         
         // XP System
         this.xp = 0;
@@ -796,7 +1169,7 @@ class GameScene extends Phaser.Scene {
         
         // Shooting cooldowns
         this.lastShotTime = 0;
-        this.shootCooldown = 250;
+        this.shootCooldown = 300;
         
         // Enemy spawn timers
         this.lastEnemySpawn = 0;
@@ -806,28 +1179,21 @@ class GameScene extends Phaser.Scene {
         
         // Enemy scaling - mode specific
         this.gameStartTime = 0;
-        this.lastScalingTime = 0;
         this.lastSpawnIncreaseTime = 0;
-        this.enemyHealthMultiplier = 1;
-        this.baseEnemyHp = 1;
-        this.baseEliteHp = 3;
-        this.baseAsteroidHp = 2;
+        this.lastAsteroidHpIncrease = 0;
         this.baseBossHp = 50;
+        this.baseAsteroidHp = 2;
         this.pauseTimeOffset = 0;
         
         // Mode-specific settings
         if (this.gameMode === 'hard') {
-            this.healthScaleInterval = 30000; // 30 seconds
             this.spawnIncreaseInterval = 45000; // 45 seconds
             this.maxUpgradeSlots = 5;
             this.spawnRateCap = 50; // Minimum spawn interval
-            this.hpScalingType = 'hard';
         } else {
-            this.healthScaleInterval = 45000; // 45 seconds
             this.spawnIncreaseInterval = 60000; // 60 seconds
             this.maxUpgradeSlots = 999; // Unlimited
             this.spawnRateCap = 200; // Minimum spawn interval
-            this.hpScalingType = 'normal';
         }
         
         // Upgrade slots (Hard Mode only)
@@ -882,6 +1248,9 @@ class GameScene extends Phaser.Scene {
 
         // Create starfield background
         this.createStarfield();
+
+        // Create player texture based on customization
+        this.createPlayerTexture(this.shipShape, this.shipColor, this.engineColor);
 
         // Create player
         this.createPlayer();
@@ -963,12 +1332,173 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    createPlayerTexture(shapeIndex, shipColor, engineColor) {
+        // Remove existing player texture to prevent overlap
+        if (this.textures.exists('player')) {
+            this.textures.remove('player');
+        }
+        
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        
+        // Draw ship outline
+        graphics.lineStyle(3, 0xffffff, 1);
+        
+        // Draw ship body based on shape
+        graphics.fillStyle(shipColor, 1);
+        
+        switch(shapeIndex) {
+            case 0: // Triangle (original)
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(32, 32);
+                graphics.lineTo(16, 26);
+                graphics.lineTo(0, 32);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 1: // Wide fighter jet
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(30, 26);
+                graphics.lineTo(28, 32);
+                graphics.lineTo(4, 32);
+                graphics.lineTo(2, 26);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 2: // Cross fighter
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(24, 12);
+                graphics.lineTo(32, 16);
+                graphics.lineTo(24, 20);
+                graphics.lineTo(16, 32);
+                graphics.lineTo(8, 20);
+                graphics.lineTo(0, 16);
+                graphics.lineTo(8, 12);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 3: // Rounded sci-fi
+                graphics.fillStyle(shipColor, 1);
+                graphics.fillCircle(16, 16, 14);
+                graphics.lineStyle(3, 0xffffff, 1);
+                graphics.strokeCircle(16, 16, 14);
+                break;
+            case 4: // Diamond ship
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(26, 16);
+                graphics.lineTo(16, 32);
+                graphics.lineTo(6, 16);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+        }
+        
+        // Draw cockpit
+        graphics.fillStyle(0x88ccff, 1);
+        graphics.fillCircle(16, 14, 5);
+        
+        // Draw engine glow
+        graphics.fillStyle(engineColor, 1);
+        graphics.fillCircle(11, 27, 3);
+        graphics.fillCircle(21, 27, 3);
+        
+        graphics.generateTexture('player', 32, 32);
+        
+        // Also create clone ship with same shape but green
+        this.createCloneShipTexture(shapeIndex);
+    }
+
+    createCloneShipTexture(shapeIndex) {
+        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+        const shipColor = 0x00ff00;
+        const engineColor = 0xffff00;
+        
+        // Draw ship outline
+        graphics.lineStyle(3, 0xffffff, 1);
+        
+        // Draw ship body based on shape
+        graphics.fillStyle(shipColor, 1);
+        
+        switch(shapeIndex) {
+            case 0: // Triangle (original)
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(32, 32);
+                graphics.lineTo(16, 26);
+                graphics.lineTo(0, 32);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 1: // Wide fighter jet
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(30, 26);
+                graphics.lineTo(28, 32);
+                graphics.lineTo(4, 32);
+                graphics.lineTo(2, 26);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 2: // Cross fighter
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(24, 12);
+                graphics.lineTo(32, 16);
+                graphics.lineTo(24, 20);
+                graphics.lineTo(16, 32);
+                graphics.lineTo(8, 20);
+                graphics.lineTo(0, 16);
+                graphics.lineTo(8, 12);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+            case 3: // Rounded sci-fi
+                graphics.fillStyle(shipColor, 1);
+                graphics.fillCircle(16, 16, 14);
+                graphics.lineStyle(3, 0xffffff, 1);
+                graphics.strokeCircle(16, 16, 14);
+                break;
+            case 4: // Diamond ship
+                graphics.beginPath();
+                graphics.moveTo(16, 0);
+                graphics.lineTo(26, 16);
+                graphics.lineTo(16, 32);
+                graphics.lineTo(6, 16);
+                graphics.closePath();
+                graphics.fillPath();
+                graphics.strokePath();
+                break;
+        }
+        
+        // Draw cockpit
+        graphics.fillStyle(0x88ff88, 1);
+        graphics.fillCircle(16, 14, 5);
+        
+        // Draw engine glow
+        graphics.fillStyle(engineColor, 1);
+        graphics.fillCircle(11, 27, 3);
+        graphics.fillCircle(21, 27, 3);
+        
+        graphics.generateTexture('cloneShip', 32, 32);
+    }
+
     createPlayer() {
         const startX = this.gameWidth / 2;
         const startY = this.gameHeight - 100;
         
         this.player = this.physics.add.sprite(startX, startY, 'player');
         this.player.setCollideWorldBounds(true);
+        this.player.body.setCircle(5, 11, 10);
         
         // Apply giant mode if upgraded
         if (this.upgrades.giant > 0) {
@@ -1487,8 +2017,9 @@ class GameScene extends Phaser.Scene {
             this.lastAsteroidSpawn = time;
         }
 
-        // Spawn boss - first at 1000, then every 2000 more points
-        if (this.score >= 1000 + (this.bossCount * 2000) && (!this.boss || this.boss.countActive(true) === 0)) {
+        // Spawn boss - 3 bosses at 1000, 5000, 10000 points
+        const bossThresholds = [1000, 5000, 10000];
+        if (this.bossCount < 3 && this.score >= bossThresholds[this.bossCount] && (!this.boss || this.boss.countActive(true) === 0)) {
             console.log('Attempting to spawn boss, score:', this.score);
             this.spawnBoss();
         }
@@ -1499,14 +2030,15 @@ class GameScene extends Phaser.Scene {
                 // Elite enemies shoot in bursts
                 if (enemy.isElite) {
                     const now = this.time.now;
+                    const bulletsPerBurst = enemy.bulletsPerBurst || 3;
                     
                     if (enemy.isBurstShooting) {
                         // In the middle of a burst - fire remaining shots with delay
-                        if (enemy.burstCount < 3 && now >= enemy.nextBurstShot) {
+                        if (enemy.burstCount < bulletsPerBurst && now >= enemy.nextBurstShot) {
                             this.enemyShoot(enemy);
                             enemy.burstCount++;
                             enemy.nextBurstShot = now + 200; // 200ms between burst shots
-                        } else if (enemy.burstCount >= 3) {
+                        } else if (enemy.burstCount >= bulletsPerBurst) {
                             // Burst complete, wait for next burst
                             enemy.isBurstShooting = false;
                             enemy.lastShotTime = now + 1500; // 1.5 seconds between bursts
@@ -1622,25 +2154,6 @@ class GameScene extends Phaser.Scene {
     updateEnemyScaling(time) {
         const elapsed = time - this.gameStartTime - (this.pauseTimeOffset || 0);
         
-        // Health scales every mode-specific interval
-        if (elapsed - this.lastScalingTime >= this.healthScaleInterval) {
-            if (this.hpScalingType === 'hard') {
-                this.baseEnemyHp += 1;
-                this.baseEliteHp += 3;
-                this.baseAsteroidHp += 2;
-                this.baseBossHp += 100;
-            } else {
-                this.baseEnemyHp += 1;
-                this.baseEliteHp += 2;
-                this.baseAsteroidHp += 1;
-                this.baseBossHp += 50;
-            }
-            this.lastScalingTime = elapsed;
-            
-            // Visual feedback - flash message
-            this.showScalingMessage();
-        }
-        
         // Spawn rate increases every mode-specific interval
         if (elapsed - this.lastSpawnIncreaseTime >= this.spawnIncreaseInterval) {
             this.enemySpawnRate = Math.max(this.spawnRateCap, this.enemySpawnRate - 200);
@@ -1663,24 +2176,12 @@ class GameScene extends Phaser.Scene {
                 onComplete: () => text.destroy()
             });
         }
-    }
-    
-    showScalingMessage() {
-        const text = this.add.text(this.gameWidth / 2, this.gameHeight / 2 - 100, 
-            `Enemy Health Increased`, {
-            fontSize: '24px',
-            fill: '#ff0000',
-            fontFamily: 'Arial',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
         
-        this.tweens.add({
-            targets: text,
-            alpha: 0,
-            y: text.y - 50,
-            duration: 2000,
-            onComplete: () => text.destroy()
-        });
+        // Asteroid HP increases every 1000 score points
+        if (this.score >= this.lastAsteroidHpIncrease + 1000) {
+            this.baseAsteroidHp += 1;
+            this.lastAsteroidHpIncrease = this.score;
+        }
     }
     
     shoot() {
@@ -1746,7 +2247,7 @@ class GameScene extends Phaser.Scene {
             bullet.explosiveDamage = this.upgrades.explosive * 3; // 3, 6, 9, 12, 15
             bullet.chainLightning = this.upgrades.lightning > 0; // Has chain lightning
             bullet.lightningJumps = 1 + (this.upgrades.lightning * 2); // 3, 5, or 7 jumps
-            bullet.lightningRange = 200 + (this.upgrades.lightning * 50); // 200, 250, or 300
+            bullet.lightningRange = 150 + (this.upgrades.lightning * 50); // 200, 250, or 300
         }
     }
     
@@ -1781,7 +2282,7 @@ class GameScene extends Phaser.Scene {
             bullet.explosiveDamage = this.upgrades.explosive * 3;
             bullet.chainLightning = this.upgrades.lightning > 0;
             bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-            bullet.lightningRange = 200 + (this.upgrades.lightning * 50);
+            bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
         }
     }
     
@@ -1829,7 +2330,7 @@ class GameScene extends Phaser.Scene {
             bullet.explosiveDamage = this.upgrades.explosive * 3;
             bullet.chainLightning = this.upgrades.lightning > 0;
             bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-            bullet.lightningRange = 200 + (this.upgrades.lightning * 50);
+            bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
         }
     }
     
@@ -1881,7 +2382,7 @@ class GameScene extends Phaser.Scene {
                         bullet.explosiveDamage = this.upgrades.explosive * 3;
                         bullet.chainLightning = this.upgrades.lightning > 0;
                         bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-                        bullet.lightningRange = 200 + (this.upgrades.lightning * 50);
+                        bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
                     }
                 }
                 index++;
@@ -2016,29 +2517,207 @@ class GameScene extends Phaser.Scene {
     spawnEnemy() {
         const x = Phaser.Math.Between(20, this.gameWidth - 20);
         
-        if (this.score > 500 && Phaser.Math.Between(0, 4) === 0) {
-            // Spawn elite enemy
-            const enemy = this.enemies.create(x, -40, 'eliteEnemy');
-            enemy.setVelocityY(Phaser.Math.Between(100, 150));
-            enemy.setVelocityX(Phaser.Math.Between(-30, 30));
-            enemy.health = this.baseEliteHp;
-            enemy.maxHealth = enemy.health;
-            enemy.scoreValue = 50;
-            enemy.isElite = true;
-            enemy.gemType = 'medium';
-            enemy.lastShotTime = this.time.now + 2000; // 2 second delay before first shot
-            enemy.isBurstShooting = false;
-            enemy.burstCount = 0;
+        // Determine spawn probabilities based on score
+        const score = this.score;
+        let spawnType = '';
+        const roll = Phaser.Math.Between(1, 100);
+        
+        if (score < 1000) {
+            // 0-999: 95% Light Red, 5% Light Purple
+            spawnType = roll <= 95 ? 'lightRed' : 'lightPurple';
+        } else if (score < 2000) {
+            // 1000-1999: 50% Light Red, 20% Dark Red, 20% Light Purple, 10% Dark Purple
+            if (roll <= 50) spawnType = 'lightRed';
+            else if (roll <= 70) spawnType = 'darkRed';
+            else if (roll <= 90) spawnType = 'lightPurple';
+            else spawnType = 'darkPurple';
+        } else if (score < 3000) {
+            // 2000-2999: 35% Light Red, 30% Dark Red, 20% Light Purple, 15% Dark Purple
+            if (roll <= 35) spawnType = 'lightRed';
+            else if (roll <= 65) spawnType = 'darkRed';
+            else if (roll <= 85) spawnType = 'lightPurple';
+            else spawnType = 'darkPurple';
+        } else if (score < 4000) {
+            // 3000-3999: 20% Light Red, 30% Dark Red, 5% Pulsing Red, 20% Light Purple, 20% Dark Purple, 5% Pulsing Purple
+            if (roll <= 20) spawnType = 'lightRed';
+            else if (roll <= 50) spawnType = 'darkRed';
+            else if (roll <= 55) spawnType = 'pulsingRed';
+            else if (roll <= 75) spawnType = 'lightPurple';
+            else if (roll <= 95) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        } else if (score < 5000) {
+            // 4000-4999: 15% Light Red, 25% Dark Red, 10% Pulsing Red, 15% Light Purple, 25% Dark Purple, 10% Pulsing Purple
+            if (roll <= 15) spawnType = 'lightRed';
+            else if (roll <= 40) spawnType = 'darkRed';
+            else if (roll <= 50) spawnType = 'pulsingRed';
+            else if (roll <= 65) spawnType = 'lightPurple';
+            else if (roll <= 90) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        } else if (score < 6000) {
+            // 5000-5999: 10% Light Red, 20% Dark Red, 15% Pulsing Red, 15% Light Purple, 30% Dark Purple, 10% Pulsing Purple
+            if (roll <= 10) spawnType = 'lightRed';
+            else if (roll <= 30) spawnType = 'darkRed';
+            else if (roll <= 45) spawnType = 'pulsingRed';
+            else if (roll <= 60) spawnType = 'lightPurple';
+            else if (roll <= 90) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        } else if (score < 7000) {
+            // 6000-6999: 5% Light Red, 15% Dark Red, 20% Pulsing Red, 15% Light Purple, 30% Dark Purple, 15% Pulsing Purple
+            if (roll <= 5) spawnType = 'lightRed';
+            else if (roll <= 20) spawnType = 'darkRed';
+            else if (roll <= 40) spawnType = 'pulsingRed';
+            else if (roll <= 55) spawnType = 'lightPurple';
+            else if (roll <= 85) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        } else if (score < 8000) {
+            // 7000-7999: 5% Light Red, 12% Dark Red, 20% Pulsing Red, 15% Light Purple, 28% Dark Purple, 20% Pulsing Purple
+            if (roll <= 5) spawnType = 'lightRed';
+            else if (roll <= 17) spawnType = 'darkRed';
+            else if (roll <= 37) spawnType = 'pulsingRed';
+            else if (roll <= 52) spawnType = 'lightPurple';
+            else if (roll <= 80) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        } else if (score < 9000) {
+            // 8000-8999: 5% Light Red, 10% Dark Red, 20% Pulsing Red, 15% Light Purple, 25% Dark Purple, 25% Pulsing Purple
+            if (roll <= 5) spawnType = 'lightRed';
+            else if (roll <= 15) spawnType = 'darkRed';
+            else if (roll <= 35) spawnType = 'pulsingRed';
+            else if (roll <= 50) spawnType = 'lightPurple';
+            else if (roll <= 75) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
         } else {
-            // Spawn regular enemy
-            const enemy = this.enemies.create(x, -20, 'enemy');
-            enemy.setVelocityY(Phaser.Math.Between(80, 120));
-            enemy.setVelocityX(Phaser.Math.Between(-20, 20));
-            enemy.health = this.baseEnemyHp;
-            enemy.maxHealth = enemy.health;
+            // 9000+: 5% Light Red, 10% Dark Red, 20% Pulsing Red, 15% Light Purple, 20% Dark Purple, 30% Pulsing Purple
+            if (roll <= 5) spawnType = 'lightRed';
+            else if (roll <= 15) spawnType = 'darkRed';
+            else if (roll <= 35) spawnType = 'pulsingRed';
+            else if (roll <= 50) spawnType = 'lightPurple';
+            else if (roll <= 70) spawnType = 'darkPurple';
+            else spawnType = 'pulsingPurple';
+        }
+        
+        // Create enemy based on type
+        let enemy;
+        const isElite = spawnType.includes('Purple');
+        
+        if (spawnType === 'lightRed') {
+            enemy = this.enemies.create(x, -20, 'enemy');
+            enemy.health = 1;
             enemy.scoreValue = 10;
-            enemy.isElite = false;
             enemy.gemType = 'small';
+            enemy.isElite = false;
+            enemy.bulletDamage = 10;
+            enemy.body.setCircle(15);
+        } else if (spawnType === 'darkRed') {
+            enemy = this.enemies.create(x, -20, 'enemyDarkRed');
+            enemy.health = this.gameMode === 'hard' ? 8 : 5;
+            enemy.scoreValue = 20;
+            enemy.gemType = 'small';
+            enemy.isElite = false;
+            enemy.bulletDamage = 10;
+            enemy.body.setCircle(15);
+        } else if (spawnType === 'pulsingRed') {
+            enemy = this.enemies.create(x, -20, 'enemyPulsingRed');
+            enemy.health = this.gameMode === 'hard' ? 15 : 10;
+            enemy.scoreValue = 30;
+            enemy.gemType = 'small';
+            enemy.isElite = false;
+            enemy.bulletDamage = 10;
+            enemy.body.setCircle(15);
+            // Alpha pulsing animation
+            this.tweens.add({
+                targets: enemy,
+                alpha: 0.3,
+                duration: 300,
+                yoyo: true,
+                repeat: -1
+            });
+            // Outline color pulsing (white to cyan)
+            const tintObj = { value: 1 };
+            this.tweens.add({
+                targets: tintObj,
+                value: 0,
+                duration: 300,
+                yoyo: true,
+                repeat: -1,
+                onUpdate: () => {
+                    const tintValue = Phaser.Display.Color.ObjectToColor({
+                        r: Math.floor(tintObj.value * 255),
+                        g: 255,
+                        b: 255
+                    }).color;
+                    enemy.setTint(tintValue);
+                }
+            });
+        } else if (spawnType === 'lightPurple') {
+            enemy = this.enemies.create(x, -40, 'eliteEnemy');
+            enemy.health = this.gameMode === 'hard' ? 8 : 5;
+            enemy.scoreValue = 50;
+            enemy.gemType = 'medium';
+            enemy.isElite = true;
+            enemy.bulletDamage = 8;
+            enemy.body.setCircle(19);
+        } else if (spawnType === 'darkPurple') {
+            enemy = this.enemies.create(x, -40, 'enemyDarkPurple');
+            enemy.health = this.gameMode === 'hard' ? 20 : 15;
+            enemy.scoreValue = 75;
+            enemy.gemType = 'medium';
+            enemy.isElite = true;
+            enemy.enemyType = 'darkPurple';
+            enemy.bulletsPerBurst = 1;
+            enemy.body.setCircle(19);
+        } else if (spawnType === 'pulsingPurple') {
+            enemy = this.enemies.create(x, -40, 'enemyPulsingPurple');
+            enemy.health = this.gameMode === 'hard' ? 30 : 25;
+            enemy.scoreValue = 100;
+            enemy.gemType = 'medium';
+            enemy.isElite = true;
+            enemy.bulletDamage = 15;
+            enemy.bulletsPerBurst = 5;
+            enemy.body.setCircle(19);
+            // Alpha pulsing animation
+            this.tweens.add({
+                targets: enemy,
+                alpha: 0.3,
+                duration: 300,
+                yoyo: true,
+                repeat: -1
+            });
+            // Outline color pulsing (white to cyan)
+            const tintObj = { value: 1 };
+            this.tweens.add({
+                targets: tintObj,
+                value: 0,
+                duration: 300,
+                yoyo: true,
+                repeat: -1,
+                onUpdate: () => {
+                    const tintValue = Phaser.Display.Color.ObjectToColor({
+                        r: Math.floor(tintObj.value * 255),
+                        g: 255,
+                        b: 255
+                    }).color;
+                    enemy.setTint(tintValue);
+                }
+            });
+        }
+        
+        // Set common enemy properties
+        enemy.maxHealth = enemy.health;
+        enemy.lastShotTime = this.time.now + 2000;
+        enemy.isBurstShooting = false;
+        enemy.burstCount = 0;
+        
+        // Set velocity
+        const vy = isElite ? Phaser.Math.Between(100, 150) : Phaser.Math.Between(80, 120);
+        enemy.setVelocityY(vy);
+        
+        // Elite enemies drift toward player
+        if (isElite) {
+            const playerX = this.player.x;
+            const direction = playerX > x ? 1 : -1;
+            enemy.setVelocityX(direction * Phaser.Math.Between(30, 50));
+        } else {
+            enemy.setVelocityX(Phaser.Math.Between(-20, 20));
         }
     }
     
@@ -2051,25 +2730,74 @@ class GameScene extends Phaser.Scene {
         asteroid.health = this.baseAsteroidHp;
         asteroid.scoreValue = 5;
         asteroid.gemType = 'small';
+        asteroid.body.setCircle(15);
     }
     
     spawnBoss() {
         try {
             this.bossCount++;
-            const boss = this.boss.create(this.gameWidth / 2, -150, 'boss');
+            
+            let bossTexture = 'boss';
+            let bossHealth = 100;
+            let bossScore = 500;
+            
+            if (this.bossCount === 1) {
+                bossTexture = 'boss';
+                bossHealth = this.gameMode === 'hard' ? 150 : 100;
+                bossScore = 500;
+            } else if (this.bossCount === 2) {
+                bossTexture = 'bossDark';
+                bossHealth = this.gameMode === 'hard' ? 600 : 500;
+                bossScore = 2000;
+            } else if (this.bossCount === 3) {
+                bossTexture = 'bossPulsing';
+                bossHealth = this.gameMode === 'hard' ? 1200 : 1000;
+                bossScore = 5000;
+            }
+            
+            const boss = this.boss.create(this.gameWidth / 2, -150, bossTexture);
             if (!boss) return;
             boss.setVelocityY(50);
-            boss.health = this.baseBossHp + (this.bossCount * 25);
+            boss.health = bossHealth;
             boss.maxHealth = boss.health;
-            boss.scoreValue = 500 + (this.bossCount * 250);
+            boss.scoreValue = bossScore;
             boss.gemType = 'large';
             boss.oscillateTime = 0;
+            boss.body.setCircle(37.5);
             
             // Create boss health bar
             boss.healthBarBg = this.add.rectangle(boss.x, boss.y - 50, 100, 10, 0x333333);
             boss.healthBarBg.setOrigin(0.5);
             boss.healthBar = this.add.rectangle(boss.x - 50, boss.y - 50, 100, 10, 0x00ff00);
             boss.healthBar.setOrigin(0, 0.5);
+            
+            // Add alpha pulsing animation for 3rd boss
+            if (this.bossCount === 3) {
+                this.tweens.add({
+                    targets: boss,
+                    alpha: 0.3,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: -1
+                });
+                // Outline color pulsing (white to cyan)
+                const tintObj = { value: 1 };
+                this.tweens.add({
+                    targets: tintObj,
+                    value: 0,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: -1,
+                    onUpdate: () => {
+                        const tintValue = Phaser.Display.Color.ObjectToColor({
+                            r: Math.floor(tintObj.value * 255),
+                            g: 255,
+                            b: 255
+                        }).color;
+                        boss.setTint(tintValue);
+                    }
+                });
+            }
             
             console.log('Boss spawned successfully');
         } catch (e) {
@@ -2085,6 +2813,8 @@ class GameScene extends Phaser.Scene {
             const powerup = this.powerups.create(x, y, type);
             powerup.setVelocityY(100);
             powerup.powerupType = type;
+            powerup.magnetized = false;
+            powerup.magnetSpeed = 400;
         }
     }
     
@@ -2094,6 +2824,8 @@ class GameScene extends Phaser.Scene {
             const healthPickup = this.powerups.create(x, y, 'healthPickup');
             healthPickup.setVelocityY(100);
             healthPickup.powerupType = 'healthPickup';
+            healthPickup.magnetized = false;
+            healthPickup.magnetSpeed = 400;
         }
     }
     
@@ -2108,11 +2840,11 @@ class GameScene extends Phaser.Scene {
                 break;
             case 'medium':
                 gem = this.gems.create(x, y, 'gemMedium');
-                xpValue = 15;
+                xpValue = 25;
                 break;
             case 'large':
                 gem = this.gems.create(x, y, 'gemLarge');
-                xpValue = 50;
+                xpValue = 100;
                 break;
         }
         
@@ -2120,7 +2852,7 @@ class GameScene extends Phaser.Scene {
             gem.xpValue = xpValue;
             gem.setVelocity(Phaser.Math.Between(-20, 20), Phaser.Math.Between(50, 100));
             gem.magnetized = false;
-            gem.magnetSpeed = 200;
+            gem.magnetSpeed = 400;
         }
     }
     
@@ -2161,8 +2893,18 @@ class GameScene extends Phaser.Scene {
                 const dy = this.player.y - powerup.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 
+                // If within magnet radius, mark as magnetized
                 if (dist < magnetRadius) {
-                    const speed = 400;
+                    powerup.magnetized = true;
+                }
+                
+                // If magnetized, always track toward player and speed up
+                if (powerup.magnetized) {
+                    // Slowly increase speed every frame
+                    powerup.magnetSpeed = Math.min(powerup.magnetSpeed * 1.001, 600);
+                    
+                    // Always move toward player
+                    const speed = powerup.magnetSpeed;
                     powerup.setVelocity(
                         (dx / dist) * speed,
                         (dy / dist) * speed
@@ -2469,22 +3211,56 @@ class GameScene extends Phaser.Scene {
     }
 
     enemyShoot(enemy) {
-        const bullet = this.enemyBullets.get(enemy.x, enemy.y + 20, 'enemyBullet');
-        if (bullet) {
-            bullet.setActive(true);
-            bullet.setVisible(true);
-            bullet.setVelocityY(300);
-            bullet.setVelocityX((this.player.x - enemy.x) / 10);
+        // Dark purple shoots 2-bullet spread instead of single angled shot
+        if (enemy.enemyType === 'darkPurple') {
+            for (let i = -1; i <= 1; i++) {
+                const bullet = this.enemyBullets.get(enemy.x + i * 20, enemy.y + 20, 'enemyBullet');
+                if (bullet) {
+                    bullet.setActive(true);
+                    bullet.setVisible(true);
+                    bullet.setVelocityY(300);
+                    bullet.setVelocityX(i * 50);
+                    bullet.damage = enemy.bulletDamage;
+                }
+            }
+        } else {
+            const bullet = this.enemyBullets.get(enemy.x, enemy.y + 20, 'enemyBullet');
+            if (bullet) {
+                bullet.setActive(true);
+                bullet.setVisible(true);
+                bullet.setVelocityY(300);
+                
+                // Light Purple shoots straight, Dark Purple aims more aggressively
+                if (enemy.bulletDamage === 8) {
+                    bullet.setVelocityX(0);
+                } else if (enemy.bulletDamage === 12) {
+                    bullet.setVelocityX((this.player.x - enemy.x) / 5);
+                } else {
+                    bullet.setVelocityX((this.player.x - enemy.x) / 10);
+                }
+                
+                bullet.damage = enemy.bulletDamage || 10;
+                
+                // Pulsing purple bullets have zigzag movement
+                if (enemy.bulletsPerBurst === 5) {
+                    bullet.zigzagPhase = 0;
+                    bullet.zigzagStartX = enemy.x;
+                    bullet.isZigzag = true;
+                }
+            }
         }
     }
 
     bossShoot(boss) {
         // Determine spread based on boss count (1=3, 2=4, 3+=5)
         let bulletCount = 3;
+        let bulletDamage = 15;
         if (this.bossCount === 2) {
             bulletCount = 4;
+            bulletDamage = 30;
         } else if (this.bossCount >= 3) {
             bulletCount = 5;
+            bulletDamage = 45;
         }
         
         const startI = -Math.floor(bulletCount / 2);
@@ -2497,6 +3273,8 @@ class GameScene extends Phaser.Scene {
                 bullet.setVisible(true);
                 bullet.setVelocityY(400);
                 bullet.setVelocityX(i * 50);
+                bullet.damage = bulletDamage;
+                bullet.isBossBullet = true;
             }
         }
     }
@@ -3440,9 +4218,19 @@ class GameScene extends Phaser.Scene {
 
         // Clean up enemy bullets
         this.enemyBullets.children.iterate((bullet) => {
-            if (bullet && bullet.active && (bullet.y < -10 || bullet.y > this.gameHeight + 10)) {
-                bullet.setActive(false);
-                bullet.setVisible(false);
+            if (bullet && bullet.active) {
+                // Pulsing purple bullets zigzag in S-shape
+                if (bullet.isZigzag && !bullet.isBossBullet) {
+                    bullet.zigzagPhase = (bullet.zigzagPhase || 0) + 0.1;
+                    const zigzagAmplitude = 50;
+                    const zigzagX = Math.sin(bullet.zigzagPhase) * zigzagAmplitude;
+                    bullet.setVelocityX(zigzagX);
+                }
+                
+                if (bullet.y < -10 || bullet.y > this.gameHeight + 10) {
+                    bullet.setActive(false);
+                    bullet.setVisible(false);
+                }
             }
         });
 
