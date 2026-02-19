@@ -809,19 +809,25 @@ class GameScene extends Phaser.Scene {
         this.lastScalingTime = 0;
         this.lastSpawnIncreaseTime = 0;
         this.enemyHealthMultiplier = 1;
+        this.baseEnemyHp = 1;
+        this.baseEliteHp = 3;
+        this.baseAsteroidHp = 2;
+        this.baseBossHp = 50;
         this.pauseTimeOffset = 0;
         
         // Mode-specific settings
         if (this.gameMode === 'hard') {
             this.healthScaleInterval = 30000; // 30 seconds
-            this.spawnIncreaseInterval = 60000; // 60 seconds
+            this.spawnIncreaseInterval = 45000; // 45 seconds
             this.maxUpgradeSlots = 5;
-            this.spawnRateCap = 100; // Minimum spawn interval
+            this.spawnRateCap = 50; // Minimum spawn interval
+            this.hpScalingType = 'hard';
         } else {
             this.healthScaleInterval = 45000; // 45 seconds
-            this.spawnIncreaseInterval = 75000; // 75 seconds
+            this.spawnIncreaseInterval = 60000; // 60 seconds
             this.maxUpgradeSlots = 999; // Unlimited
-            this.spawnRateCap = 300; // Minimum spawn interval
+            this.spawnRateCap = 200; // Minimum spawn interval
+            this.hpScalingType = 'normal';
         }
         
         // Upgrade slots (Hard Mode only)
@@ -1099,6 +1105,13 @@ class GameScene extends Phaser.Scene {
             fontFamily: 'Arial'
         }).setOrigin(0.5);
         
+        // Timer text
+        this.timerText = this.add.text(this.gameWidth / 2, 55, 'Time: 0:00', {
+            fontSize: '16px',
+            fill: '#ffffff',
+            fontFamily: 'Arial'
+        }).setOrigin(0.5);
+        
         // Active upgrade indicators
         this.rapidText = this.add.text(this.gameWidth - 20, 50, '', {
             fontSize: '18px',
@@ -1307,6 +1320,13 @@ class GameScene extends Phaser.Scene {
             return;
         }
 
+        // Update timer display
+        const elapsed = time - this.gameStartTime - (this.pauseTimeOffset || 0);
+        const totalSeconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        this.timerText.setText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+
         // Update enemy scaling
         this.updateEnemyScaling(time);
 
@@ -1337,7 +1357,7 @@ class GameScene extends Phaser.Scene {
         }
 
         // Shooting
-        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.spaceKey.isDown) {
+        if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.spaceKey.isDown || this.input.activePointer.isDown) {
             if (time > this.lastShotTime + this.shootCooldown) {
                 this.shoot();
                 this.lastShotTime = time;
@@ -1604,7 +1624,17 @@ class GameScene extends Phaser.Scene {
         
         // Health scales every mode-specific interval
         if (elapsed - this.lastScalingTime >= this.healthScaleInterval) {
-            this.enemyHealthMultiplier *= 1.20;
+            if (this.hpScalingType === 'hard') {
+                this.baseEnemyHp += 1;
+                this.baseEliteHp += 3;
+                this.baseAsteroidHp += 2;
+                this.baseBossHp += 100;
+            } else {
+                this.baseEnemyHp += 1;
+                this.baseEliteHp += 2;
+                this.baseAsteroidHp += 1;
+                this.baseBossHp += 50;
+            }
             this.lastScalingTime = elapsed;
             
             // Visual feedback - flash message
@@ -1637,7 +1667,7 @@ class GameScene extends Phaser.Scene {
     
     showScalingMessage() {
         const text = this.add.text(this.gameWidth / 2, this.gameHeight / 2 - 100, 
-            `Enemy Health +15%`, {
+            `Enemy Health Increased`, {
             fontSize: '24px',
             fill: '#ff0000',
             fontFamily: 'Arial',
@@ -1652,7 +1682,7 @@ class GameScene extends Phaser.Scene {
             onComplete: () => text.destroy()
         });
     }
-
+    
     shoot() {
         const x = this.player.x;
         const y = this.player.y - 20;
@@ -1991,7 +2021,7 @@ class GameScene extends Phaser.Scene {
             const enemy = this.enemies.create(x, -40, 'eliteEnemy');
             enemy.setVelocityY(Phaser.Math.Between(100, 150));
             enemy.setVelocityX(Phaser.Math.Between(-30, 30));
-            enemy.health = Math.floor(3 * this.enemyHealthMultiplier);
+            enemy.health = this.baseEliteHp;
             enemy.maxHealth = enemy.health;
             enemy.scoreValue = 50;
             enemy.isElite = true;
@@ -2004,32 +2034,32 @@ class GameScene extends Phaser.Scene {
             const enemy = this.enemies.create(x, -20, 'enemy');
             enemy.setVelocityY(Phaser.Math.Between(80, 120));
             enemy.setVelocityX(Phaser.Math.Between(-20, 20));
-            enemy.health = Math.floor(1 * this.enemyHealthMultiplier);
+            enemy.health = this.baseEnemyHp;
             enemy.maxHealth = enemy.health;
             enemy.scoreValue = 10;
             enemy.isElite = false;
             enemy.gemType = 'small';
         }
     }
-
+    
     spawnAsteroid() {
         const x = Phaser.Math.Between(20, this.gameWidth - 20);
         const asteroid = this.asteroids.create(x, -20, 'asteroid');
         asteroid.setVelocityY(Phaser.Math.Between(50, 100));
         asteroid.setVelocityX(Phaser.Math.Between(-20, 20));
         asteroid.setAngularVelocity(Phaser.Math.Between(-50, 50));
-        asteroid.health = Math.floor(2 * this.enemyHealthMultiplier);
+        asteroid.health = this.baseAsteroidHp;
         asteroid.scoreValue = 5;
         asteroid.gemType = 'small';
     }
-
+    
     spawnBoss() {
         try {
             this.bossCount++;
             const boss = this.boss.create(this.gameWidth / 2, -150, 'boss');
             if (!boss) return;
             boss.setVelocityY(50);
-            boss.health = Math.floor((50 + (this.bossCount * 25)) * this.enemyHealthMultiplier);
+            boss.health = this.baseBossHp + (this.bossCount * 25);
             boss.maxHealth = boss.health;
             boss.scoreValue = 500 + (this.bossCount * 250);
             boss.gemType = 'large';
@@ -2417,7 +2447,20 @@ class GameScene extends Phaser.Scene {
             this.pauseText.setVisible(true);
         } else {
             // Track accumulated pause time
-            this.pauseTimeOffset += this.time.now - this.lastPauseTime;
+            const pauseDuration = this.time.now - this.lastPauseTime;
+            this.pauseTimeOffset += pauseDuration;
+            
+            // Adjust powerup expire times to account for paused time
+            if (this.rapidFireExpireTime > 0) {
+                this.rapidFireExpireTime += pauseDuration;
+            }
+            if (this.multiShotExpireTime > 0) {
+                this.multiShotExpireTime += pauseDuration;
+            }
+            if (this.lasersExpireTime > 0) {
+                this.lasersExpireTime += pauseDuration;
+            }
+            
             this.physics.world.resume();
             if (this.pauseText) {
                 this.pauseText.setVisible(false);
@@ -2945,7 +2988,7 @@ class GameScene extends Phaser.Scene {
 
     fireLasers() {
         const speed = 450; // pixels per second
-        const totalLength = 240; // laser length in pixels
+        const laserLength = 120; // length of the laser beam itself
         const damage = 3;
 
         // Create two lasers - one up-left, one up-right (45 degree angles)
@@ -2954,129 +2997,88 @@ class GameScene extends Phaser.Scene {
         for (let i = 0; i < 2; i++) {
             const angle = angles[i];
             
-            // Precompute the full bounce path
-            const path = this.computeLaserPath(this.player.x, this.player.y, angle, totalLength);
+            // Precompute full path with 5 bounces + extension
+            const fullPath = this.computeFullLaserPath(this.player.x, this.player.y, angle, 5);
+            
+            // Calculate total path length
+            let totalLength = 0;
+            for (let j = 1; j < fullPath.length; j++) {
+                const dx = fullPath[j].x - fullPath[j-1].x;
+                const dy = fullPath[j].y - fullPath[j-1].y;
+                totalLength += Math.sqrt(dx * dx + dy * dy);
+            }
             
             // Create graphics for this laser
             const graphics = this.add.graphics();
-
+            
             const laser = {
-                path: path, // Array of {x, y} points forming the complete path
-                totalLength: this.calculatePathLength(path), // Total length of path
-                headDistance: 5, // Start with small offset so beam is visible immediately
+                path: fullPath, // Complete path points
+                pathDistance: 0, // How far along the path we've traveled
+                totalLength: totalLength, // Total length of path
                 speed: speed,
+                laserLength: laserLength,
                 damage: damage,
-                hitEnemies: new Set(), // Track which enemies have been hit
+                hitEnemies: new Set(),
                 graphics: graphics,
                 active: true,
-                bounceCount: 0, // Track completed bounces
                 maxBounces: 5,
-                headOffScreen: false // Track when head has gone off-screen after max bounces
+                bouncesCompleted: 0,
+                offScreen: false
             };
 
             this.lasersArray.push(laser);
         }
     }
 
-    computeLaserPath(startX, startY, angle, maxLength) {
-        const path = [{ x: startX, y: startY }];
+    computeFullLaserPath(startX, startY, angle, numBounces) {
+        const path = [{ x: startX, y: startY, segment: 0 }];
         let currentX = startX;
         let currentY = startY;
         let currentAngle = angle;
-        let remainingLength = maxLength;
-        let bounces = 0;
-        const maxBounces = 5;
         const margin = 5;
         
-        while (remainingLength > 0 && bounces < maxBounces) {
-            // Calculate direction
+        for (let b = 0; b < numBounces; b++) {
             const vx = Math.cos(currentAngle);
             const vy = Math.sin(currentAngle);
             
-            // Find distance to nearest wall
             let distToWall = Infinity;
             let hitWall = null;
             
-            // Check left wall
             if (vx < 0) {
                 const dist = (margin - currentX) / vx;
-                if (dist > 0 && dist < distToWall) {
-                    distToWall = dist;
-                    hitWall = 'left';
-                }
+                if (dist > 0 && dist < distToWall) { distToWall = dist; hitWall = 'left'; }
             }
-            // Check right wall
             if (vx > 0) {
                 const dist = (this.gameWidth - margin - currentX) / vx;
-                if (dist > 0 && dist < distToWall) {
-                    distToWall = dist;
-                    hitWall = 'right';
-                }
+                if (dist > 0 && dist < distToWall) { distToWall = dist; hitWall = 'right'; }
             }
-            // Check top wall
             if (vy < 0) {
                 const dist = (margin - currentY) / vy;
-                if (dist > 0 && dist < distToWall) {
-                    distToWall = dist;
-                    hitWall = 'top';
-                }
+                if (dist > 0 && dist < distToWall) { distToWall = dist; hitWall = 'top'; }
             }
-            // Check bottom wall
             if (vy > 0) {
                 const dist = (this.gameHeight - margin - currentY) / vy;
-                if (dist > 0 && dist < distToWall) {
-                    distToWall = dist;
-                    hitWall = 'bottom';
-                }
+                if (dist > 0 && dist < distToWall) { distToWall = dist; hitWall = 'bottom'; }
             }
             
-            // If we can't travel the full remaining length
-            if (distToWall < remainingLength) {
-                // Move to wall
-                currentX += vx * distToWall;
-                currentY += vy * distToWall;
-                remainingLength -= distToWall;
-                
-                // Add bounce point
-                path.push({ x: currentX, y: currentY });
-                
-                // Reflect angle
-                if (hitWall === 'left' || hitWall === 'right') {
-                    currentAngle = Math.PI - currentAngle;
-                } else {
-                    currentAngle = -currentAngle;
-                }
-                
-                bounces++;
+            currentX += vx * distToWall;
+            currentY += vy * distToWall;
+            path.push({ x: currentX, y: currentY, segment: b + 1 });
+            
+            if (hitWall === 'left' || hitWall === 'right') {
+                currentAngle = Math.PI - currentAngle;
             } else {
-                // Can reach full length without bouncing
-                currentX += vx * remainingLength;
-                currentY += vy * remainingLength;
-                path.push({ x: currentX, y: currentY });
-                remainingLength = 0;
+                currentAngle = -currentAngle;
             }
         }
         
-        // If we ran out of bounces but still have length, extend to edge
-        if (remainingLength > 0) {
-            const vx = Math.cos(currentAngle);
-            const vy = Math.sin(currentAngle);
-            currentX += vx * remainingLength;
-            currentY += vy * remainingLength;
-            path.push({ x: currentX, y: currentY });
-        }
+        // Add extension beyond last bounce to go off-screen (make it really long)
+        const extLen = 2000;
+        currentX += Math.cos(currentAngle) * extLen;
+        currentY += Math.sin(currentAngle) * extLen;
+        path.push({ x: currentX, y: currentY, segment: 6 });
         
         return path;
-    }
-
-    calculatePathLength(path) {
-        let length = 0;
-        for (let i = 1; i < path.length; i++) {
-            const dx = path[i].x - path[i-1].x;
-            const dy = path[i].y - path[i-1].y;
-            length += Math.sqrt(dx * dx + dy * dy);
-        }
-        return length;
     }
 
     updateLasers(time, delta) {
@@ -3086,282 +3088,228 @@ class GameScene extends Phaser.Scene {
             const laser = this.lasersArray[i];
 
             if (!laser.active) {
-                // Remove inactive lasers
                 laser.graphics.destroy();
                 this.lasersArray.splice(i, 1);
                 continue;
             }
 
-            // Move the laser head along the path
-            laser.headDistance += laser.speed * dt;
+            // Move along the path
+            laser.pathDistance += laser.speed * dt;
 
-            // Track which bounces have been completed
-            let currentDist = 0;
-            for (let j = 1; j < laser.path.length; j++) {
-                const dx = laser.path[j].x - laser.path[j-1].x;
-                const dy = laser.path[j].y - laser.path[j-1].y;
-                const segLength = Math.sqrt(dx * dx + dy * dy);
-                
-                if (currentDist + segLength <= laser.headDistance) {
-                    // We've passed this bounce point
-                    if (j > laser.bounceCount) {
-                        laser.bounceCount = j;
-                        laser.hitEnemies.clear(); // Reset hit enemies on new bounce
+            // Get head position on path
+            const headPos = this.getPointOnPath(laser.path, laser.pathDistance);
+            const headX = headPos.x;
+            const headY = headPos.y;
+            
+            // Track bounces completed
+            if (headPos.segment > laser.bouncesCompleted) {
+                laser.bouncesCompleted = headPos.segment;
+                laser.hitEnemies.clear();
+            }
+
+            // Get tail position (laserLength behind head)
+            const tailDist = Math.max(0, laser.pathDistance - laser.laserLength);
+            const tailPos = this.getPointOnPath(laser.path, tailDist);
+            const tailX = tailPos.x;
+            const tailY = tailPos.y;
+
+            // After 5 bounces (segment 5 or 6), wait until path is fully traveled then check off-screen
+            if (laser.bouncesCompleted >= 5) {
+                // Wait until the laser has traveled past the end of the path
+                if (laser.pathDistance >= laser.totalLength) {
+                    if (tailX < -50 || tailX > this.gameWidth + 50 ||
+                        tailY < -50 || tailY > this.gameHeight + 50) {
+                        laser.active = false;
+                        laser.graphics.destroy();
+                        this.lasersArray.splice(i, 1);
+                        continue;
                     }
                 }
-                currentDist += segLength;
             }
 
-            // Check if head has gone past max bounces + gone off-screen
-            if (laser.bounceCount >= laser.maxBounces) {
-                const headPos = this.getPointAtDistance(laser.path, laser.headDistance);
-                if (headPos.x < -50 || headPos.x > this.gameWidth + 50 ||
-                    headPos.y < -50 || headPos.y > this.gameHeight + 50) {
-                    laser.headOffScreen = true;
-                }
-            }
+            // Store positions for drawing and collision
+            laser.headX = headX;
+            laser.headY = headY;
+            laser.tailX = tailX;
+            laser.tailY = tailY;
 
-            // Calculate tail position (240px behind head)
-            const tailDistance = Math.max(0, laser.headDistance - 240);
-
-            // If head is off-screen after max bounces and tail is also off-screen, destroy
-            if (laser.headOffScreen) {
-                const tailPos = this.getPointAtDistance(laser.path, tailDistance);
-                if (tailPos.x < -50 || tailPos.x > this.gameWidth + 50 ||
-                    tailPos.y < -50 || tailPos.y > this.gameHeight + 50) {
-                    laser.active = false;
-                    laser.graphics.destroy();
-                    this.lasersArray.splice(i, 1);
-                    continue;
-                }
-            }
-
-            // Check collisions with enemies/asteroids/boss
+            // Check collisions
             this.checkLaserCollisions(laser);
 
-            // Draw the laser
+            // Draw
             this.drawLaser(laser);
         }
     }
 
-    getPointAtDistance(path, distance) {
-        if (distance <= 0) return path[0];
+    getPointOnPath(path, distance) {
+        let traveled = 0;
         
-        let currentDist = 0;
         for (let i = 0; i < path.length - 1; i++) {
-            const dx = path[i+1].x - path[i].x;
-            const dy = path[i+1].y - path[i].y;
-            const segLength = Math.sqrt(dx * dx + dy * dy);
+            const p1 = path[i];
+            const p2 = path[i + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const segLen = Math.sqrt(dx * dx + dy * dy);
             
-            if (currentDist + segLength >= distance) {
-                // Point is on this segment
-                const t = (distance - currentDist) / segLength;
+            if (traveled + segLen >= distance) {
+                const t = (distance - traveled) / segLen;
                 return {
-                    x: path[i].x + dx * t,
-                    y: path[i].y + dy * t
+                    x: p1.x + dx * t,
+                    y: p1.y + dy * t,
+                    segment: p1.segment
                 };
             }
-            
-            currentDist += segLength;
+            traveled += segLen;
         }
         
-        // Past the end of path
+        // Past end of path
         const last = path[path.length - 1];
-        const secondLast = path[path.length - 2];
-        const dx = last.x - secondLast.x;
-        const dy = last.y - secondLast.y;
-        const segLength = Math.sqrt(dx * dx + dy * dy);
-        const extraDist = distance - currentDist;
-        const t = extraDist / segLength;
+        return { x: last.x, y: last.y, segment: last.segment };
+    }
+
+    getPathSegmentFull(path, startDist, endDist) {
+        const result = [];
+        let traveled = 0;
         
-        return {
-            x: last.x + dx * t,
-            y: last.y + dy * t
-        };
+        for (let i = 0; i < path.length - 1; i++) {
+            const p1 = path[i];
+            const p2 = path[i + 1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const segLen = Math.sqrt(dx * dx + dy * dy);
+            
+            const segStart = traveled;
+            const segEnd = traveled + segLen;
+            
+            // Skip segments outside our range
+            if (segEnd < startDist || segStart > endDist) {
+                traveled += segLen;
+                continue;
+            }
+            
+            // Calculate visible portion of this segment
+            const t1 = Math.max(0, (startDist - segStart) / segLen);
+            const t2 = Math.min(1, (endDist - segStart) / segLen);
+            
+            if (result.length === 0 || i === 0) {
+                result.push({
+                    x: p1.x + dx * t1,
+                    y: p1.y + dy * t1
+                });
+            }
+            
+            if (t2 > t1) {
+                result.push({
+                    x: p1.x + dx * t2,
+                    y: p1.y + dy * t2
+                });
+            }
+            
+            traveled += segLen;
+        }
+        
+        return result;
     }
 
     drawLaser(laser) {
         const graphics = laser.graphics;
         graphics.clear();
 
-        // Calculate tail position (240px behind head, or at start if not fully extended)
-        const tailDistance = Math.max(0, laser.headDistance - 240);
+        // Get visible portion of path
+        const tailDist = Math.max(0, laser.pathDistance - laser.laserLength);
+        const headDist = laser.pathDistance;
         
-        // Get visible portion of the path
-        const visiblePath = this.getPathSegment(laser.path, tailDistance, laser.headDistance);
+        // Get all points along the visible portion
+        const visiblePoints = this.getPathSegmentFull(laser.path, tailDist, headDist);
         
-        if (visiblePath.length < 2) return;
+        if (visiblePoints.length < 2) return;
 
-        // Draw gradient line
+        // Draw gradient line through all visible points
         // Outer glow (darker green) - 12px
         graphics.lineStyle(12, 0x00aa00, 0.6);
         graphics.beginPath();
-        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
-        for (let i = 1; i < visiblePath.length; i++) {
-            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
+        graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
+        for (let i = 1; i < visiblePoints.length; i++) {
+            graphics.lineTo(visiblePoints[i].x, visiblePoints[i].y);
         }
         graphics.strokePath();
 
         // Middle layer - 8px
         graphics.lineStyle(8, 0x00dd00, 0.8);
         graphics.beginPath();
-        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
-        for (let i = 1; i < visiblePath.length; i++) {
-            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
+        graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
+        for (let i = 1; i < visiblePoints.length; i++) {
+            graphics.lineTo(visiblePoints[i].x, visiblePoints[i].y);
         }
         graphics.strokePath();
 
         // Core (bright green) - 4px
         graphics.lineStyle(4, 0xccffcc, 1);
         graphics.beginPath();
-        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
-        for (let i = 1; i < visiblePath.length; i++) {
-            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
+        graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
+        for (let i = 1; i < visiblePoints.length; i++) {
+            graphics.lineTo(visiblePoints[i].x, visiblePoints[i].y);
         }
+        graphics.strokePath();
         graphics.strokePath();
     }
 
-    getPathSegment(path, startDist, endDist) {
-        const result = [];
-        let currentDist = 0;
-        
-        // Find start point
-        let startPoint = null;
-        let startIndex = 0;
-        let startT = 0;
-        
-        for (let i = 0; i < path.length - 1; i++) {
-            const dx = path[i+1].x - path[i].x;
-            const dy = path[i+1].y - path[i].y;
-            const segLength = Math.sqrt(dx * dx + dy * dy);
-            
-            if (currentDist + segLength >= startDist) {
-                // Start is on this segment
-                const t = (startDist - currentDist) / segLength;
-                startPoint = {
-                    x: path[i].x + dx * t,
-                    y: path[i].y + dy * t
-                };
-                startIndex = i;
-                startT = t;
-                break;
-            }
-            
-            currentDist += segLength;
-        }
-        
-        if (!startPoint) {
-            // Start is past the end of path
-            return result;
-        }
-        
-        result.push(startPoint);
-        
-        // Add intermediate points
-        currentDist = startDist;
-        for (let i = startIndex; i < path.length - 1; i++) {
-            const dx = path[i+1].x - path[i].x;
-            const dy = path[i+1].y - path[i].y;
-            const segLength = Math.sqrt(dx * dx + dy * dy);
-            
-            // If this is the first segment after start, account for partial segment
-            if (i === startIndex && startT > 0) {
-                const remainingLength = segLength * (1 - startT);
-                if (currentDist + remainingLength >= endDist) {
-                    // End is on this segment
-                    const t = startT + (endDist - currentDist) / segLength;
-                    result.push({
-                        x: path[i].x + dx * t,
-                        y: path[i].y + dy * t
-                    });
-                    return result;
-                }
-                currentDist += remainingLength;
-                result.push(path[i+1]);
-            } else {
-                if (currentDist + segLength >= endDist) {
-                    // End is on this segment
-                    const t = (endDist - currentDist) / segLength;
-                    result.push({
-                        x: path[i].x + dx * t,
-                        y: path[i].y + dy * t
-                    });
-                    return result;
-                }
-                currentDist += segLength;
-                result.push(path[i+1]);
-            }
-        }
-        
-        return result;
-    }
-
     checkLaserCollisions(laser) {
-        // Calculate tail position (240px behind head)
-        const tailDistance = Math.max(0, laser.headDistance - 240);
+        // Use actual beam line from tail to head
+        const start = { x: laser.tailX, y: laser.tailY };
+        const end = { x: laser.headX, y: laser.headY };
         
-        // Get visible portion of path for collision detection
-        const visiblePath = this.getPathSegment(laser.path, tailDistance, laser.headDistance);
-        
-        if (visiblePath.length < 2) return;
-        
-        // Check each segment of the visible path against enemies/asteroids/boss
-        for (let i = 0; i < visiblePath.length - 1; i++) {
-            const start = visiblePath[i];
-            const end = visiblePath[i + 1];
-            
-            // Check against enemies
-            this.enemies.children.iterate((enemy) => {
-                if (enemy && enemy.active && !laser.hitEnemies.has(enemy)) {
-                    if (this.lineIntersectsCircle(start, end, enemy, 16)) {
-                        enemy.health -= laser.damage;
-                        laser.hitEnemies.add(enemy);
-                        this.createLaserHitVFX(enemy.x, enemy.y);
+        // Check against enemies
+        this.enemies.children.iterate((enemy) => {
+            if (enemy && enemy.active && !laser.hitEnemies.has(enemy)) {
+                if (this.lineIntersectsCircle(start, end, enemy, 16)) {
+                    enemy.health -= laser.damage;
+                    laser.hitEnemies.add(enemy);
+                    this.createLaserHitVFX(enemy.x, enemy.y);
 
-                        if (enemy.health <= 0) {
-                            this.destroyEnemy(enemy);
-                        }
+                    if (enemy.health <= 0) {
+                        this.destroyEnemy(enemy);
                     }
                 }
-            });
+            }
+        });
 
-            // Check against asteroids
-            this.asteroids.children.iterate((asteroid) => {
-                if (asteroid && asteroid.active && !laser.hitEnemies.has(asteroid)) {
-                    if (this.lineIntersectsCircle(start, end, asteroid, 16)) {
-                        asteroid.health -= laser.damage;
-                        laser.hitEnemies.add(asteroid);
-                        this.createLaserHitVFX(asteroid.x, asteroid.y);
+        // Check against asteroids
+        this.asteroids.children.iterate((asteroid) => {
+            if (asteroid && asteroid.active && !laser.hitEnemies.has(asteroid)) {
+                if (this.lineIntersectsCircle(start, end, asteroid, 16)) {
+                    asteroid.health -= laser.damage;
+                    laser.hitEnemies.add(asteroid);
+                    this.createLaserHitVFX(asteroid.x, asteroid.y);
 
-                        if (asteroid.health <= 0) {
-                            this.destroyAsteroid(asteroid);
-                        }
+                    if (asteroid.health <= 0) {
+                        this.destroyAsteroid(asteroid);
                     }
                 }
-            });
+            }
+        });
 
-            // Check against boss
-            this.boss.children.iterate((boss) => {
-                if (boss && boss.active && !laser.hitEnemies.has(boss)) {
-                    if (this.lineIntersectsCircle(start, end, boss, 40)) {
-                        boss.health -= laser.damage;
-                        laser.hitEnemies.add(boss);
-                        this.createLaserHitVFX(boss.x, boss.y);
+        // Check against boss
+        this.boss.children.iterate((boss) => {
+            if (boss && boss.active && !laser.hitEnemies.has(boss)) {
+                if (this.lineIntersectsCircle(start, end, boss, 40)) {
+                    boss.health -= laser.damage;
+                    laser.hitEnemies.add(boss);
+                    this.createLaserHitVFX(boss.x, boss.y);
 
-                        if (boss.health <= 0) {
-                            this.createExplosion(boss.x, boss.y, 20);
-                            if (boss.gemType) {
-                                this.spawnGem(boss.x, boss.y, boss.gemType);
-                            }
-                            if (boss.healthBarBg) boss.healthBarBg.destroy();
-                            if (boss.healthBar) boss.healthBar.destroy();
-                            this.score += boss.scoreValue;
-                            boss.destroy();
+                    if (boss.health <= 0) {
+                        this.createExplosion(boss.x, boss.y, 20);
+                        if (boss.gemType) {
+                            this.spawnGem(boss.x, boss.y, boss.gemType);
                         }
+                        if (boss.healthBarBg) boss.healthBarBg.destroy();
+                        if (boss.healthBar) boss.healthBar.destroy();
+                        this.score += boss.scoreValue;
+                        boss.destroy();
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     lineIntersectsCircle(tail, head, circle, radius) {
@@ -3402,18 +3350,28 @@ class GameScene extends Phaser.Scene {
     }
 
     createLaserHitVFX(x, y) {
-        // Small green particle burst at hit location
+        // Green flash at hit location
+        const flash = this.add.circle(x, y, 20, 0x00ff00, 0.8);
+        this.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 1.5,
+            duration: 150,
+            onComplete: () => flash.destroy()
+        });
+        
+        // Green particle burst at hit location
         const particles = this.add.particles(0, 0, 'particle', {
-            speed: { min: 50, max: 100 },
-            scale: { start: 0.5, end: 0 },
+            speed: { min: 80, max: 150 },
+            scale: { start: 0.8, end: 0 },
             blendMode: 'ADD',
-            lifespan: 300,
+            lifespan: 400,
             tint: 0x00ff00
         });
-        particles.explode(5, x, y);
+        particles.explode(12, x, y);
         
         // Auto-destroy after animation
-        this.time.delayedCall(400, () => {
+        this.time.delayedCall(500, () => {
             particles.destroy();
         });
     }
