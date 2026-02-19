@@ -2969,8 +2969,9 @@ class GameScene extends Phaser.Scene {
                 hitEnemies: new Set(), // Track which enemies have been hit
                 graphics: graphics,
                 active: true,
-                fadeOut: false, // Whether laser is fading out (tail leaving screen)
-                fadeProgress: 0 // How much has faded from the front
+                phase: 'growing', // 'growing', 'lingering', 'fading'
+                fadeProgress: 0, // How much has faded from the front
+                lingerTimer: 0 // Timer for lingering phase (in seconds)
             };
 
             this.lasersArray.push(laser);
@@ -3091,15 +3092,23 @@ class GameScene extends Phaser.Scene {
                 continue;
             }
 
-            if (!laser.fadeOut) {
+            if (laser.phase === 'growing') {
                 // Growing phase - laser extending from ship
                 laser.currentLength += laser.speed * dt;
                 
                 if (laser.currentLength >= laser.totalLength) {
                     laser.currentLength = laser.totalLength;
-                    laser.fadeOut = true; // Start fade out phase
+                    laser.phase = 'lingering'; // Switch to lingering phase
+                    laser.lingerTimer = 2.0; // Linger for 2 seconds fully visible
                 }
-            } else {
+            } else if (laser.phase === 'lingering') {
+                // Lingering phase - laser fully visible
+                laser.lingerTimer -= dt;
+                
+                if (laser.lingerTimer <= 0) {
+                    laser.phase = 'fading'; // Start fade out phase
+                }
+            } else if (laser.phase === 'fading') {
                 // Fading phase - laser retracting (tail leaving screen)
                 laser.fadeProgress += laser.speed * dt;
                 
