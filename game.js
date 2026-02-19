@@ -2963,15 +2963,15 @@ class GameScene extends Phaser.Scene {
             const laser = {
                 path: path, // Array of {x, y} points forming the complete path
                 totalLength: this.calculatePathLength(path), // Total length of path
-                currentLength: 0, // How much of the laser is currently visible
+                headDistance: 0, // How far the head has traveled along the path
                 speed: speed,
                 damage: damage,
                 hitEnemies: new Set(), // Track which enemies have been hit
                 graphics: graphics,
                 active: true,
-                phase: 'growing', // 'growing', 'lingering', 'fading'
-                fadeProgress: 0, // How much has faded from the front
-                lingerTimer: 0 // Timer for lingering phase (in seconds)
+                bounceCount: 0, // Track completed bounces
+                maxBounces: 5,
+                headOffScreen: false // Track when head has gone off-screen after max bounces
             };
 
             this.lasersArray.push(laser);
@@ -3092,28 +3092,43 @@ class GameScene extends Phaser.Scene {
                 continue;
             }
 
-            if (laser.phase === 'growing') {
-                // Growing phase - laser extending from ship
-                laser.currentLength += laser.speed * dt;
+            // Move the laser head along the path
+            laser.headDistance += laser.speed * dt;
+
+            // Track which bounces have been completed
+            let currentDist = 0;
+            for (let j = 1; j < laser.path.length; j++) {
+                const dx = laser.path[j].x - laser.path[j-1].x;
+                const dy = laser.path[j].y - laser.path[j-1].y;
+                const segLength = Math.sqrt(dx * dx + dy * dy);
                 
-                if (laser.currentLength >= laser.totalLength) {
-                    laser.currentLength = laser.totalLength;
-                    laser.phase = 'lingering'; // Switch to lingering phase
-                    laser.lingerTimer = 2.0; // Linger for 2 seconds fully visible
+                if (currentDist + segLength <= laser.headDistance) {
+                    // We've passed this bounce point
+                    if (j > laser.bounceCount) {
+                        laser.bounceCount = j;
+                        laser.hitEnemies.clear(); // Reset hit enemies on new bounce
+                    }
                 }
-            } else if (laser.phase === 'lingering') {
-                // Lingering phase - laser fully visible
-                laser.lingerTimer -= dt;
-                
-                if (laser.lingerTimer <= 0) {
-                    laser.phase = 'fading'; // Start fade out phase
+                currentDist += segLength;
+            }
+
+            // Check if head has gone past max bounces + gone off-screen
+            if (laser.bounceCount >= laser.maxBounces) {
+                const headPos = this.getPointAtDistance(laser.path, laser.headDistance);
+                if (headPos.x < -50 || headPos.x > this.gameWidth + 50 ||
+                    headPos.y < -50 || headPos.y > this.gameHeight + 50) {
+                    laser.headOffScreen = true;
                 }
-            } else if (laser.phase === 'fading') {
-                // Fading phase - laser retracting (tail leaving screen)
-                laser.fadeProgress += laser.speed * dt;
-                
-                // Check if laser is fully off-screen
-                if (laser.fadeProgress >= laser.totalLength) {
+            }
+
+            // Calculate tail position (240px behind head)
+            const tailDistance = Math.max(0, laser.headDistance - 240);
+
+            // If head is off-screen after max bounces and tail is also off-screen, destroy
+            if (laser.headOffScreen) {
+                const tailPos = this.getPointAtDistance(laser.path, tailDistance);
+                if (tailPos.x < -50 || tailPos.x > this.gameWidth + 50 ||
+                    tailPos.y < -50 || tailPos.y > this.gameHeight + 50) {
                     laser.active = false;
                     laser.graphics.destroy();
                     this.lasersArray.splice(i, 1);
@@ -3129,15 +3144,51 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    getPointAtDistance(path, distance) {
+        if (distance <= 0) return path[0];
+        
+        let currentDist = 0;
+        for (let i = 0; i < path.length - 1; i++) {
+            const dx = path[i+1].x - path[i].x;
+            const dy = path[i+1].y - path[i].y;
+            const segLength = Math.sqrt(dx * dx + dy * dy);
+            
+            if (currentDist + segLength >= distance) {
+                // Point is on this segment
+                const t = (distance - currentDist) / segLength;
+                return {
+                    x: path[i].x + dx * t,
+                    y: path[i].y + dy * t
+                };
+            }
+            
+            currentDist += segLength;
+        }
+        
+        // Past the end of path
+        const last = path[path.length - 1];
+        const secondLast = path[path.length - 2];
+        const dx = last.x - secondLast.x;
+        const dy = last.y - secondLast.y;
+        const segLength = Math.sqrt(dx * dx + dy * dy);
+        const extraDist = distance - currentDist;
+        const t = extraDist / segLength;
+        
+        return {
+            x: last.x + dx * t,
+            y: last.y + dy * t
+        };
+    }
+
     drawLaser(laser) {
         const graphics = laser.graphics;
         graphics.clear();
 
-        // Calculate visible portion of the path
-        const startDist = laser.fadeOut ? laser.fadeProgress : 0;
-        const endDist = laser.fadeOut ? laser.totalLength : laser.currentLength;
+        // Calculate tail position (240px behind head, or at start if not fully extended)
+        const tailDistance = Math.max(0, laser.headDistance - 240);
         
-        const visiblePath = this.getPathSegment(laser.path, startDist, endDist);
+        // Get visible portion of the path
+        const visiblePath = this.getPathSegment(laser.path, tailDistance, laser.headDistance);
         
         if (visiblePath.length < 2) return;
 
@@ -3246,42 +3297,18 @@ class GameScene extends Phaser.Scene {
     }
 
     checkLaserCollisions(laser) {
+        // Calculate tail position (240px behind head)
+        const tailDistance = Math.max(0, laser.headDistance - 240);
+        
         // Get visible portion of path for collision detection
-        const startDist = laser.fadeOut ? laser.fadeProgress : 0;
-        const endDist = laser.fadeOut ? laser.totalLength : laser.currentLength;
+        const visiblePath = this.getPathSegment(laser.path, tailDistance, laser.headDistance);
+        
+        if (visiblePath.length < 2) return;
         
         // Check each segment of the visible path against enemies/asteroids/boss
-        let currentDist = 0;
-        
-        for (let i = 0; i < laser.path.length - 1; i++) {
-            const p1 = laser.path[i];
-            const p2 = laser.path[i+1];
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const segLength = Math.sqrt(dx * dx + dy * dy);
-            
-            // Check if this segment is within the visible range
-            const segStart = currentDist;
-            const segEnd = currentDist + segLength;
-            
-            if (segEnd < startDist || segStart > endDist) {
-                // Segment is outside visible range
-                currentDist += segLength;
-                continue;
-            }
-            
-            // Calculate visible portion of this segment
-            const visibleStartT = Math.max(0, (startDist - segStart) / segLength);
-            const visibleEndT = Math.min(1, (endDist - segStart) / segLength);
-            
-            const start = {
-                x: p1.x + dx * visibleStartT,
-                y: p1.y + dy * visibleStartT
-            };
-            const end = {
-                x: p1.x + dx * visibleEndT,
-                y: p1.y + dy * visibleEndT
-            };
+        for (let i = 0; i < visiblePath.length - 1; i++) {
+            const start = visiblePath[i];
+            const end = visiblePath[i + 1];
             
             // Check against enemies
             this.enemies.children.iterate((enemy) => {
@@ -3334,8 +3361,6 @@ class GameScene extends Phaser.Scene {
                     }
                 }
             });
-            
-            currentDist += segLength;
         }
     }
 
