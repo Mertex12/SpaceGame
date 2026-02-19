@@ -2963,7 +2963,7 @@ class GameScene extends Phaser.Scene {
             const laser = {
                 path: path, // Array of {x, y} points forming the complete path
                 totalLength: this.calculatePathLength(path), // Total length of path
-                headDistance: 0, // How far the head has traveled along the path
+                headDistance: 5, // Start with small offset so beam is visible immediately
                 speed: speed,
                 damage: damage,
                 hitEnemies: new Set(), // Track which enemies have been hit
