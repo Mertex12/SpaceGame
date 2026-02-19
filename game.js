@@ -2945,9 +2945,7 @@ class GameScene extends Phaser.Scene {
 
     fireLasers() {
         const speed = 450; // pixels per second
-        const totalLength = 240; // laser length in pixels (doubled)
-        const numSegments = 24; // Number of segments (doubled for smoother appearance)
-        const segmentLength = totalLength / numSegments; // 10px per segment
+        const totalLength = 240; // laser length in pixels
         const damage = 3;
 
         // Create two lasers - one up-left, one up-right (45 degree angles)
@@ -2955,72 +2953,129 @@ class GameScene extends Phaser.Scene {
 
         for (let i = 0; i < 2; i++) {
             const angle = angles[i];
-            const vx = Math.cos(angle) * speed;
-            const vy = Math.sin(angle) * speed;
-
+            
+            // Precompute the full bounce path
+            const path = this.computeLaserPath(this.player.x, this.player.y, angle, totalLength);
+            
             // Create graphics for this laser
             const graphics = this.add.graphics();
 
-            // Start with just the head (first segment)
-            const segments = [{
-                x: this.player.x,
-                y: this.player.y,
-                vx: vx,
-                vy: vy,
-                bounceIndex: 0
-            }];
-
             const laser = {
-                segments: segments, // Array of segment positions (starts with just head)
-                numSegments: numSegments,
-                segmentLength: segmentLength,
-                bouncePoints: [], // Array of {x, y, vx, vy} for each bounce
-                bounceCount: 0,
-                hitEnemies: new Set(),
+                path: path, // Array of {x, y} points forming the complete path
+                totalLength: this.calculatePathLength(path), // Total length of path
+                currentLength: 0, // How much of the laser is currently visible
+                speed: speed,
+                damage: damage,
+                hitEnemies: new Set(), // Track which enemies have been hit
                 graphics: graphics,
                 active: true,
-                damage: damage,
-                speed: speed,
-                spawnTimer: null, // Timer for spawning remaining segments
-                fullySpawned: false // Whether all segments are spawned
+                fadeOut: false, // Whether laser is fading out (tail leaving screen)
+                fadeProgress: 0 // How much has faded from the front
             };
 
             this.lasersArray.push(laser);
-
-            // Spawn remaining segments one by one with delay
-            let segmentIndex = 1;
-            laser.spawnTimer = this.time.addEvent({
-                delay: 20, // 20ms between each segment (halved for smoother spawning)
-                repeat: numSegments - 2, // Spawn remaining segments (minus head)
-                callback: () => {
-                    if (!laser.active) {
-                        // Clean up timer if laser destroyed
-                        if (laser.spawnTimer) {
-                            laser.spawnTimer.remove();
-                            laser.spawnTimer = null;
-                        }
-                        return;
-                    }
-                    
-                    // Add new segment behind the last one
-                    const lastSeg = laser.segments[laser.segments.length - 1];
-                    const newSeg = {
-                        x: lastSeg.x - (lastSeg.vx / speed) * segmentLength,
-                        y: lastSeg.y - (lastSeg.vy / speed) * segmentLength,
-                        vx: lastSeg.vx,
-                        vy: lastSeg.vy,
-                        bounceIndex: 0
-                    };
-                    laser.segments.push(newSeg);
-                    
-                    segmentIndex++;
-                    if (segmentIndex >= numSegments) {
-                        laser.fullySpawned = true;
-                        laser.spawnTimer = null;
-                    }
-                }
-            });
         }
+    }
+
+    computeLaserPath(startX, startY, angle, maxLength) {
+        const path = [{ x: startX, y: startY }];
+        let currentX = startX;
+        let currentY = startY;
+        let currentAngle = angle;
+        let remainingLength = maxLength;
+        let bounces = 0;
+        const maxBounces = 5;
+        const margin = 5;
+        
+        while (remainingLength > 0 && bounces < maxBounces) {
+            // Calculate direction
+            const vx = Math.cos(currentAngle);
+            const vy = Math.sin(currentAngle);
+            
+            // Find distance to nearest wall
+            let distToWall = Infinity;
+            let hitWall = null;
+            
+            // Check left wall
+            if (vx < 0) {
+                const dist = (margin - currentX) / vx;
+                if (dist > 0 && dist < distToWall) {
+                    distToWall = dist;
+                    hitWall = 'left';
+                }
+            }
+            // Check right wall
+            if (vx > 0) {
+                const dist = (this.gameWidth - margin - currentX) / vx;
+                if (dist > 0 && dist < distToWall) {
+                    distToWall = dist;
+                    hitWall = 'right';
+                }
+            }
+            // Check top wall
+            if (vy < 0) {
+                const dist = (margin - currentY) / vy;
+                if (dist > 0 && dist < distToWall) {
+                    distToWall = dist;
+                    hitWall = 'top';
+                }
+            }
+            // Check bottom wall
+            if (vy > 0) {
+                const dist = (this.gameHeight - margin - currentY) / vy;
+                if (dist > 0 && dist < distToWall) {
+                    distToWall = dist;
+                    hitWall = 'bottom';
+                }
+            }
+            
+            // If we can't travel the full remaining length
+            if (distToWall < remainingLength) {
+                // Move to wall
+                currentX += vx * distToWall;
+                currentY += vy * distToWall;
+                remainingLength -= distToWall;
+                
+                // Add bounce point
+                path.push({ x: currentX, y: currentY });
+                
+                // Reflect angle
+                if (hitWall === 'left' || hitWall === 'right') {
+                    currentAngle = Math.PI - currentAngle;
+                } else {
+                    currentAngle = -currentAngle;
+                }
+                
+                bounces++;
+            } else {
+                // Can reach full length without bouncing
+                currentX += vx * remainingLength;
+                currentY += vy * remainingLength;
+                path.push({ x: currentX, y: currentY });
+                remainingLength = 0;
+            }
+        }
+        
+        // If we ran out of bounces but still have length, extend to edge
+        if (remainingLength > 0) {
+            const vx = Math.cos(currentAngle);
+            const vy = Math.sin(currentAngle);
+            currentX += vx * remainingLength;
+            currentY += vy * remainingLength;
+            path.push({ x: currentX, y: currentY });
+        }
+        
+        return path;
+    }
+
+    calculatePathLength(path) {
+        let length = 0;
+        for (let i = 1; i < path.length; i++) {
+            const dx = path[i].x - path[i-1].x;
+            const dy = path[i].y - path[i-1].y;
+            length += Math.sqrt(dx * dx + dy * dy);
+        }
+        return length;
     }
 
     updateLasers(time, delta) {
@@ -3036,141 +3091,20 @@ class GameScene extends Phaser.Scene {
                 continue;
             }
 
-            const head = laser.segments[0];
-
-            // Move head (segment 0)
-            head.x += head.vx * dt;
-            head.y += head.vy * dt;
-
-            // Check for wall collisions (bounce) - only if we haven't reached bounce limit
-            let bounced = false;
-            const margin = 5;
-
-            // Only allow bouncing if we haven't hit the 5 bounce limit
-            if (laser.bounceCount < 5) {
-                // Check left/right walls
-                if (head.x < margin) {
-                    // Hit left wall - record bounce point BEFORE changing velocity
-                    laser.bouncePoints.push({
-                        x: margin,
-                        y: head.y,
-                        vx: Math.abs(head.vx), // New velocity after bounce
-                        vy: head.vy
-                    });
-                    head.x = margin + (margin - head.x); // Reflect position
-                    head.vx = Math.abs(head.vx); // Reverse X
-                    bounced = true;
-                } else if (head.x > this.gameWidth - margin) {
-                    // Hit right wall
-                    laser.bouncePoints.push({
-                        x: this.gameWidth - margin,
-                        y: head.y,
-                        vx: -Math.abs(head.vx),
-                        vy: head.vy
-                    });
-                    head.x = (this.gameWidth - margin) - (head.x - (this.gameWidth - margin));
-                    head.vx = -Math.abs(head.vx);
-                    bounced = true;
-                }
-
-                // Check top/bottom walls
-                if (head.y < margin) {
-                    // Hit top wall
-                    laser.bouncePoints.push({
-                        x: head.x,
-                        y: margin,
-                        vx: head.vx,
-                        vy: Math.abs(head.vy)
-                    });
-                    head.y = margin + (margin - head.y);
-                    head.vy = Math.abs(head.vy);
-                    bounced = true;
-                } else if (head.y > this.gameHeight - margin) {
-                    // Hit bottom wall
-                    laser.bouncePoints.push({
-                        x: head.x,
-                        y: this.gameHeight - margin,
-                        vx: head.vx,
-                        vy: -Math.abs(head.vy)
-                    });
-                    head.y = (this.gameHeight - margin) - (head.y - (this.gameHeight - margin));
-                    head.vy = -Math.abs(head.vy);
-                    bounced = true;
-                }
-            }
-
-            if (bounced) {
-                laser.bounceCount++;
-                laser.hitEnemies.clear(); // Reset hit enemies for new bounce cycle
-            }
-
-            // Update remaining segments - each follows the bounce points
-            // Use segments.length to handle partially spawned lasers
-            for (let s = 1; s < laser.segments.length; s++) {
-                const segment = laser.segments[s];
-
-                // Move segment with its current velocity
-                segment.x += segment.vx * dt;
-                segment.y += segment.vy * dt;
-
-                // Check if segment should bounce (hit a bounce point)
-                const targetBounceIndex = segment.bounceIndex;
-                if (targetBounceIndex < laser.bouncePoints.length) {
-                    const bouncePoint = laser.bouncePoints[targetBounceIndex];
-                    
-                    // Calculate distance to bounce point
-                    const dx = segment.x - bouncePoint.x;
-                    const dy = segment.y - bouncePoint.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    
-                    // Check if segment is very close to bounce point (stricter for right angles)
-                    // or if it has passed the bounce point (moving away from it)
-                    const movingAway = (dx * segment.vx + dy * segment.vy) > 0;
-                    
-                    if (dist < 5) {
-                        // Segment reached bounce point - snap to exact position for clean right angle
-                        segment.x = bouncePoint.x;
-                        segment.y = bouncePoint.y;
-                        segment.vx = bouncePoint.vx;
-                        segment.vy = bouncePoint.vy;
-                        segment.bounceIndex++;
-                    } else if (movingAway && dist < 20) {
-                        // Segment passed bounce point - snap back and change direction
-                        segment.x = bouncePoint.x;
-                        segment.y = bouncePoint.y;
-                        segment.vx = bouncePoint.vx;
-                        segment.vy = bouncePoint.vy;
-                        segment.bounceIndex++;
-                    }
-                }
+            if (!laser.fadeOut) {
+                // Growing phase - laser extending from ship
+                laser.currentLength += laser.speed * dt;
                 
-                // After bouncing, maintain proper spacing from leader for straight lines
-                if (segment.bounceIndex > 0 && segment.bounceIndex <= laser.bouncePoints.length) {
-                    const leader = laser.segments[s - 1];
-                    // Check if leader has already bounced at this point
-                    if (leader.bounceIndex > segment.bounceIndex - 1) {
-                        // Both have bounced - ensure straight line in new direction
-                        const dx = leader.x - segment.x;
-                        const dy = leader.y - segment.y;
-                        const currentDist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (currentDist > 0 && Math.abs(currentDist - laser.segmentLength) > 2) {
-                            // Adjust position to maintain exact segment length
-                            const targetX = leader.x - (dx / currentDist) * laser.segmentLength;
-                            const targetY = leader.y - (dy / currentDist) * laser.segmentLength;
-                            segment.x = targetX;
-                            segment.y = targetY;
-                        }
-                    }
+                if (laser.currentLength >= laser.totalLength) {
+                    laser.currentLength = laser.totalLength;
+                    laser.fadeOut = true; // Start fade out phase
                 }
-            }
-
-            // Check if laser should be destroyed (off-screen after bounce limit)
-            // Wait until tail is fully off-screen so entire laser leaves screen
-            if (laser.bounceCount >= 5) {
-                const tail = laser.segments[laser.segments.length - 1];
-                if (tail.x < -50 || tail.x > this.gameWidth + 50 ||
-                    tail.y < -50 || tail.y > this.gameHeight + 50) {
+            } else {
+                // Fading phase - laser retracting (tail leaving screen)
+                laser.fadeProgress += laser.speed * dt;
+                
+                // Check if laser is fully off-screen
+                if (laser.fadeProgress >= laser.totalLength) {
                     laser.active = false;
                     laser.graphics.destroy();
                     this.lasersArray.splice(i, 1);
@@ -3190,54 +3124,156 @@ class GameScene extends Phaser.Scene {
         const graphics = laser.graphics;
         graphics.clear();
 
-        // Draw path through all segments
-        const head = laser.segments[0];
-        // Use actual segments length for partially spawned lasers
-        const numSegs = laser.segments.length;
-        const tail = laser.segments[numSegs - 1];
+        // Calculate visible portion of the path
+        const startDist = laser.fadeOut ? laser.fadeProgress : 0;
+        const endDist = laser.fadeOut ? laser.totalLength : laser.currentLength;
+        
+        const visiblePath = this.getPathSegment(laser.path, startDist, endDist);
+        
+        if (visiblePath.length < 2) return;
 
-        // Create path from tail to head through all segments
-        const path = [];
-        for (let s = numSegs - 1; s >= 0; s--) {
-            path.push({ x: laser.segments[s].x, y: laser.segments[s].y });
-        }
-
-        // Draw gradient line - thickness doubled
+        // Draw gradient line
         // Outer glow (darker green) - 12px
         graphics.lineStyle(12, 0x00aa00, 0.6);
         graphics.beginPath();
-        graphics.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-            graphics.lineTo(path[i].x, path[i].y);
+        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
+        for (let i = 1; i < visiblePath.length; i++) {
+            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
         }
         graphics.strokePath();
 
         // Middle layer - 8px
         graphics.lineStyle(8, 0x00dd00, 0.8);
         graphics.beginPath();
-        graphics.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-            graphics.lineTo(path[i].x, path[i].y);
+        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
+        for (let i = 1; i < visiblePath.length; i++) {
+            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
         }
         graphics.strokePath();
 
         // Core (bright green) - 4px
         graphics.lineStyle(4, 0xccffcc, 1);
         graphics.beginPath();
-        graphics.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-            graphics.lineTo(path[i].x, path[i].y);
+        graphics.moveTo(visiblePath[0].x, visiblePath[0].y);
+        for (let i = 1; i < visiblePath.length; i++) {
+            graphics.lineTo(visiblePath[i].x, visiblePath[i].y);
         }
         graphics.strokePath();
     }
 
-    checkLaserCollisions(laser) {
-        // Check each segment pair against enemies/asteroids/boss
-        // Use segments.length to handle partially spawned lasers
-        for (let s = 0; s < laser.segments.length - 1; s++) {
-            const start = laser.segments[s];
-            const end = laser.segments[s + 1];
+    getPathSegment(path, startDist, endDist) {
+        const result = [];
+        let currentDist = 0;
+        
+        // Find start point
+        let startPoint = null;
+        let startIndex = 0;
+        let startT = 0;
+        
+        for (let i = 0; i < path.length - 1; i++) {
+            const dx = path[i+1].x - path[i].x;
+            const dy = path[i+1].y - path[i].y;
+            const segLength = Math.sqrt(dx * dx + dy * dy);
+            
+            if (currentDist + segLength >= startDist) {
+                // Start is on this segment
+                const t = (startDist - currentDist) / segLength;
+                startPoint = {
+                    x: path[i].x + dx * t,
+                    y: path[i].y + dy * t
+                };
+                startIndex = i;
+                startT = t;
+                break;
+            }
+            
+            currentDist += segLength;
+        }
+        
+        if (!startPoint) {
+            // Start is past the end of path
+            return result;
+        }
+        
+        result.push(startPoint);
+        
+        // Add intermediate points
+        currentDist = startDist;
+        for (let i = startIndex; i < path.length - 1; i++) {
+            const dx = path[i+1].x - path[i].x;
+            const dy = path[i+1].y - path[i].y;
+            const segLength = Math.sqrt(dx * dx + dy * dy);
+            
+            // If this is the first segment after start, account for partial segment
+            if (i === startIndex && startT > 0) {
+                const remainingLength = segLength * (1 - startT);
+                if (currentDist + remainingLength >= endDist) {
+                    // End is on this segment
+                    const t = startT + (endDist - currentDist) / segLength;
+                    result.push({
+                        x: path[i].x + dx * t,
+                        y: path[i].y + dy * t
+                    });
+                    return result;
+                }
+                currentDist += remainingLength;
+                result.push(path[i+1]);
+            } else {
+                if (currentDist + segLength >= endDist) {
+                    // End is on this segment
+                    const t = (endDist - currentDist) / segLength;
+                    result.push({
+                        x: path[i].x + dx * t,
+                        y: path[i].y + dy * t
+                    });
+                    return result;
+                }
+                currentDist += segLength;
+                result.push(path[i+1]);
+            }
+        }
+        
+        return result;
+    }
 
+    checkLaserCollisions(laser) {
+        // Get visible portion of path for collision detection
+        const startDist = laser.fadeOut ? laser.fadeProgress : 0;
+        const endDist = laser.fadeOut ? laser.totalLength : laser.currentLength;
+        
+        // Check each segment of the visible path against enemies/asteroids/boss
+        let currentDist = 0;
+        
+        for (let i = 0; i < laser.path.length - 1; i++) {
+            const p1 = laser.path[i];
+            const p2 = laser.path[i+1];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const segLength = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check if this segment is within the visible range
+            const segStart = currentDist;
+            const segEnd = currentDist + segLength;
+            
+            if (segEnd < startDist || segStart > endDist) {
+                // Segment is outside visible range
+                currentDist += segLength;
+                continue;
+            }
+            
+            // Calculate visible portion of this segment
+            const visibleStartT = Math.max(0, (startDist - segStart) / segLength);
+            const visibleEndT = Math.min(1, (endDist - segStart) / segLength);
+            
+            const start = {
+                x: p1.x + dx * visibleStartT,
+                y: p1.y + dy * visibleStartT
+            };
+            const end = {
+                x: p1.x + dx * visibleEndT,
+                y: p1.y + dy * visibleEndT
+            };
+            
             // Check against enemies
             this.enemies.children.iterate((enemy) => {
                 if (enemy && enemy.active && !laser.hitEnemies.has(enemy)) {
@@ -3289,6 +3325,8 @@ class GameScene extends Phaser.Scene {
                     }
                 }
             });
+            
+            currentDist += segLength;
         }
     }
 
@@ -3347,12 +3385,8 @@ class GameScene extends Phaser.Scene {
     }
 
     cleanupLasers() {
-        // Destroy all active lasers and their spawn timers
+        // Destroy all active lasers
         for (const laser of this.lasersArray) {
-            if (laser.spawnTimer) {
-                laser.spawnTimer.remove();
-                laser.spawnTimer = null;
-            }
             if (laser.graphics) {
                 laser.graphics.destroy();
             }
