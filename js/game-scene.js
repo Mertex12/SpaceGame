@@ -1,1127 +1,3 @@
-// Phaser 3 Space Shooter Game - Roguelike Edition
-// Complete game with all assets generated programmatically
-
-class IntroScene extends Phaser.Scene {
-    constructor() {
-        super({ key: 'IntroScene' });
-    }
-
-    create() {
-        this.gameWidth = this.sys.game.config.width;
-        this.gameHeight = this.sys.game.config.height;
-        
-        // Ship customization defaults
-        this.selectedShape = 0;
-        this.selectedColor = 4; // Blue by default
-        this.selectedEngineColor = 1; // Orange by default
-
-        // Colors array
-        this.colors = [
-            { name: 'Red', hex: 0xFF0000, css: '#ff0000' },
-            { name: 'Orange', hex: 0xFFA500, css: '#ffa500' },
-            { name: 'Yellow', hex: 0xFFFF00, css: '#ffff00' },
-            { name: 'Green', hex: 0x00FF00, css: '#00ff00' },
-            { name: 'Blue', hex: 0x0066FF, css: '#0066ff' },
-            { name: 'Indigo', hex: 0x4B0082, css: '#4b0082' },
-            { name: 'Violet', hex: 0x8B00FF, css: '#8b00ff' }
-        ];
-
-        // Background
-        this.add.rectangle(this.gameWidth / 2, this.gameHeight / 2, this.gameWidth, this.gameHeight, 0x000011);
-
-        // Starfield
-        this.stars = this.physics.add.group();
-        for (let i = 0; i < 100; i++) {
-            const x = Phaser.Math.Between(0, this.gameWidth);
-            const y = Phaser.Math.Between(0, this.gameHeight);
-            const star = this.stars.create(x, y, 'star');
-            star.setAlpha(Phaser.Math.FloatBetween(0.3, 1));
-            star.speed = Phaser.Math.FloatBetween(0.5, 2);
-        }
-
-        // Title
-        const titleText = this.add.text(this.gameWidth / 2, 40, 'SPACE GAME', {
-            fontSize: '56px',
-            fill: '#00ffff',
-            fontFamily: 'Arial',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-
-        // Title glow effect
-        this.tweens.add({
-            targets: titleText,
-            alpha: 0.7,
-            duration: 1000,
-            yoyo: true,
-            repeat: -1
-        });
-
-        // ===== SINGLE PREVIEW BOX =====
-        const boxX = this.gameWidth / 2;
-        const boxY = 240;
-        const boxSize = 100;
-        const arrowSpacing = 50;
-        const shipScale = 2.5;
-        
-        // Main preview box
-        this.add.rectangle(boxX, boxY, boxSize, boxSize, 0x222233).setStrokeStyle(3, 0x444455);
-        
-        // Ship preview graphics - offset to center it (origin is top-left of 32x32, so offset by half scaled size)
-        this.shipPreview = this.add.graphics();
-        this.shipPreview.setPosition(boxX - 16 * shipScale, boxY - 16 * shipScale);
-        this.shipPreview.setScale(shipScale);
-        
-        // ===== ROW 1: SHAPE ARROWS (top) =====
-        const row1Y = boxY - arrowSpacing;
-        
-        // Label on far left
-        this.add.text(boxX - boxSize/2 - 160, row1Y, 'Shape', {
-            fontSize: '18px',
-            fill: '#888888',
-            fontFamily: 'Arial'
-        }).setOrigin(0, 0.5);
-        
-        // Left arrow (left side of box)
-        const leftShapeArrow = this.add.text(boxX - boxSize/2 - 30, row1Y, '<', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        // Right arrow (right side of box)
-        const rightShapeArrow = this.add.text(boxX + boxSize/2 + 30, row1Y, '>', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        leftShapeArrow.on('pointerdown', () => {
-            this.selectedShape = (this.selectedShape - 1 + 5) % 5;
-            this.updateShipPreview();
-        });
-        
-        rightShapeArrow.on('pointerdown', () => {
-            this.selectedShape = (this.selectedShape + 1) % 5;
-            this.updateShipPreview();
-        });
-
-        // ===== ROW 2: SHIP COLOR ARROWS (middle) =====
-        const row2Y = boxY;
-        
-        // Label on far left
-        this.add.text(boxX - boxSize/2 - 160, row2Y, 'Ship Color', {
-            fontSize: '18px',
-            fill: '#888888',
-            fontFamily: 'Arial'
-        }).setOrigin(0, 0.5);
-        
-        // Left arrow (left side of box)
-        const leftColorArrow = this.add.text(boxX - boxSize/2 - 30, row2Y, '<', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        // Right arrow (right side of box)
-        const rightColorArrow = this.add.text(boxX + boxSize/2 + 30, row2Y, '>', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        leftColorArrow.on('pointerdown', () => {
-            this.selectedColor = (this.selectedColor - 1 + 7) % 7;
-            this.updateShipPreview();
-        });
-        
-        rightColorArrow.on('pointerdown', () => {
-            this.selectedColor = (this.selectedColor + 1) % 7;
-            this.updateShipPreview();
-        });
-
-        // ===== ROW 3: ENGINE COLOR ARROWS (bottom) =====
-        const row3Y = boxY + arrowSpacing;
-        
-        // Label on far left
-        this.add.text(boxX - boxSize/2 - 160, row3Y, 'Engine Color', {
-            fontSize: '18px',
-            fill: '#888888',
-            fontFamily: 'Arial'
-        }).setOrigin(0, 0.5);
-        
-        // Left arrow (left side of box)
-        const leftEngineArrow = this.add.text(boxX - boxSize/2 - 30, row3Y, '<', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        // Right arrow (right side of box)
-        const rightEngineArrow = this.add.text(boxX + boxSize/2 + 30, row3Y, '>', {
-            fontSize: '32px',
-            fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        
-        leftEngineArrow.on('pointerdown', () => {
-            this.selectedEngineColor = (this.selectedEngineColor - 1 + 7) % 7;
-            this.updateShipPreview();
-        });
-        
-        rightEngineArrow.on('pointerdown', () => {
-            this.selectedEngineColor = (this.selectedEngineColor + 1) % 7;
-            this.updateShipPreview();
-        });
-
-        // ===== DIFFICULTY SELECTION =====
-        this.add.text(this.gameWidth / 2, 480, 'Select Difficulty', {
-            fontSize: '20px',
-            fill: '#aaaaaa',
-            fontFamily: 'Arial'
-        }).setOrigin(0.5);
-
-        // Normal Mode Button
-        const normalButton = this.createButton(this.gameWidth / 2 - 150, 530, 'Normal Mode', 0x00aa00, () => {
-            this.startGame('normal');
-        });
-
-        // Hard Mode Button
-        const hardButton = this.createButton(this.gameWidth / 2 + 150, 530, 'Hard Mode', 0xaa0000, () => {
-            this.startGame('hard');
-        });
-
-        // Normal Mode Description
-        this.add.text(this.gameWidth / 2 - 150, 580, 'Standard gameplay\nNo limits', {
-            fontSize: '14px',
-            fill: '#888888',
-            fontFamily: 'Arial',
-            align: 'center'
-        }).setOrigin(0.5);
-
-        // Hard Mode Description
-        this.add.text(this.gameWidth / 2 + 150, 580, 'Faster enemy scaling\nLimited upgrades', {
-            fontSize: '14px',
-            fill: '#888888',
-            fontFamily: 'Arial',
-            align: 'center'
-        }).setOrigin(0.5);
-        
-        // Initial preview update
-        this.updateShipPreview();
-    }
-
-    updateShipPreview() {
-        this.shipPreview.clear();
-        this.drawShipPreview(this.shipPreview, this.selectedShape, this.colors[this.selectedColor].hex, this.colors[this.selectedEngineColor].hex);
-    }
-
-    drawShipPreview(graphics, shapeIndex, shipColor, engineColor) {
-        graphics.clear();
-        
-        // Draw ship outline
-        graphics.lineStyle(2, 0xffffff, 1);
-        
-        // Draw ship body based on shape
-        graphics.fillStyle(shipColor, 1);
-        
-        switch(shapeIndex) {
-            case 0: // Triangle (original)
-                graphics.beginPath();
-                graphics.moveTo(16, 2);
-                graphics.lineTo(30, 30);
-                graphics.lineTo(16, 24);
-                graphics.lineTo(2, 30);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 1: // Wide fighter jet
-                graphics.beginPath();
-                graphics.moveTo(16, 2);
-                graphics.lineTo(30, 26);
-                graphics.lineTo(28, 30);
-                graphics.lineTo(4, 30);
-                graphics.lineTo(2, 26);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 2: // Cross fighter
-                graphics.beginPath();
-                graphics.moveTo(16, 2);
-                graphics.lineTo(24, 12);
-                graphics.lineTo(32, 16);
-                graphics.lineTo(24, 20);
-                graphics.lineTo(16, 30);
-                graphics.lineTo(8, 20);
-                graphics.lineTo(0, 16);
-                graphics.lineTo(8, 12);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 3: // Rounded sci-fi
-                graphics.fillStyle(shipColor, 1);
-                graphics.fillCircle(16, 16, 14);
-                graphics.lineStyle(2, 0xffffff, 1);
-                graphics.strokeCircle(16, 16, 14);
-                break;
-            case 4: // Diamond ship
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(26, 16);
-                graphics.lineTo(16, 32);
-                graphics.lineTo(6, 16);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-        }
-        
-        // Draw cockpit
-        graphics.fillStyle(0x88ccff, 1);
-        graphics.fillCircle(16, 14, 5);
-        
-        // Draw engine glow
-        graphics.fillStyle(engineColor, 1);
-        graphics.fillCircle(11, 26, 3);
-        graphics.fillCircle(21, 26, 3);
-    }
-
-    createButton(x, y, text, color, callback) {
-        const width = 220;
-        const height = 60;
-
-        const bg = this.add.rectangle(x, y, width, height, color);
-        bg.setStrokeStyle(3, 0xffffff);
-        bg.setInteractive({ useHandCursor: true });
-
-        const label = this.add.text(x, y, text, {
-            fontSize: '24px',
-            fill: '#ffffff',
-            fontFamily: 'Arial',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-
-        // Hover effects
-        bg.on('pointerover', () => {
-            bg.setFillStyle(color, 0.8);
-            bg.setScale(1.05);
-        });
-
-        bg.on('pointerout', () => {
-            bg.setFillStyle(color, 1);
-            bg.setScale(1);
-        });
-
-        bg.on('pointerdown', () => {
-            this.selectionMade = true;
-            callback();
-        });
-
-        return bg;
-    }
-
-    startGame(mode) {
-        this.cameras.main.fade(500, 0, 0, 0);
-        this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { 
-                gameMode: mode,
-                shipShape: this.selectedShape,
-                shipColor: this.colors[this.selectedColor].hex,
-                engineColor: this.colors[this.selectedEngineColor].hex
-            });
-        });
-    }
-
-    update(time, delta) {
-        // Animate stars
-        this.stars.children.iterate((star) => {
-            star.y += star.speed;
-            if (star.y > this.gameHeight) {
-                star.y = 0;
-                star.x = Phaser.Math.Between(0, this.gameWidth);
-            }
-        });
-    }
-}
-
-class BootScene extends Phaser.Scene {
-    constructor() {
-        super({ key: 'BootScene' });
-    }
-
-    preload() {
-        // Create all textures programmatically
-        this.createPlayerTexture();
-        this.createCloneTexture();
-        this.createAsteroidTexture();
-        this.createEnemyTexture();
-        this.createEliteEnemyTexture();
-        this.createDarkRedEnemyTexture();
-        this.createPulsingRedEnemyTexture();
-        this.createDarkPurpleEnemyTexture();
-        this.createPulsingPurpleEnemyTexture();
-        this.createBossTexture();
-        this.createDarkBossTexture();
-        this.createPulsingBossTexture();
-        this.createBulletTexture();
-        this.createEnemyBulletTexture();
-        this.createPowerupShieldTexture();
-        this.createPowerupRapidTexture();
-        this.createPowerupMultiTexture();
-        this.createPowerupLasersTexture();
-        this.createHealthPickupTexture();
-        this.createStarTexture();
-        this.createParticleTexture();
-        
-        // Gem textures
-        this.createGemSmallTexture();
-        this.createGemMediumTexture();
-        this.createGemLargeTexture();
-        
-        // Upgrade icon textures
-        this.createUpgradePiercingTexture();
-        this.createUpgradeDronesTexture();
-        this.createUpgradeRearTexture();
-        this.createUpgradeSideCannonTexture();
-        this.createUpgradeExplosiveTexture();
-        this.createUpgradeLightningTexture();
-        this.createUpgradeVampiricTexture();
-        this.createUpgradeShieldTexture();
-        this.createUpgradeMagnetTexture();
-        this.createUpgradeThornsTexture();
-        this.createUpgradeGarlicTexture();
-        this.createUpgradeNukeTexture();
-        this.createUpgradeCloneTexture();
-        this.createUpgradeGiantTexture();
-        this.createUpgradeBerserkerTexture();
-    }
-
-    createPlayerTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw white outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 0);
-        graphics.lineTo(32, 32);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(0, 32);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        // Draw spaceship body
-        graphics.fillStyle(0x00aaff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 0);
-        graphics.lineTo(32, 32);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(0, 32);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Draw cockpit
-        graphics.fillStyle(0x88ccff, 1);
-        graphics.fillCircle(16, 16, 6);
-        
-        // Draw engine glow
-        graphics.fillStyle(0xff6600, 1);
-        graphics.fillCircle(12, 28, 3);
-        graphics.fillCircle(20, 28, 3);
-        
-        graphics.generateTexture('player', 32, 32);
-    }
-
-    createCloneTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw white outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 0);
-        graphics.lineTo(32, 32);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(0, 32);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        // Draw spaceship body - GREEN instead of blue
-        graphics.fillStyle(0x00ff00, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 0);
-        graphics.lineTo(32, 32);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(0, 32);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Draw cockpit
-        graphics.fillStyle(0x88ff88, 1);
-        graphics.fillCircle(16, 16, 6);
-        
-        // Draw engine glow
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(12, 28, 3);
-        graphics.fillCircle(20, 28, 3);
-        
-        graphics.generateTexture('cloneShip', 32, 32);
-    }
-
-    createAsteroidTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw irregular asteroid shape
-        graphics.fillStyle(0x8b7355, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 0);
-        graphics.lineTo(28, 8);
-        graphics.lineTo(32, 20);
-        graphics.lineTo(24, 32);
-        graphics.lineTo(8, 32);
-        graphics.lineTo(0, 20);
-        graphics.lineTo(4, 8);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Add some craters
-        graphics.fillStyle(0x6b5344, 1);
-        graphics.fillCircle(10, 12, 3);
-        graphics.fillCircle(22, 18, 4);
-        graphics.fillCircle(14, 24, 2);
-        
-        graphics.generateTexture('asteroid', 32, 32);
-    }
-
-    createEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw enemy ship
-        graphics.fillStyle(0xff3333, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 32);
-        graphics.lineTo(32, 0);
-        graphics.lineTo(16, 8);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Draw engine glow
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(8, 4, 2);
-        graphics.fillCircle(24, 4, 2);
-        
-        graphics.generateTexture('enemy', 32, 32);
-    }
-
-    createEliteEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw elite enemy ship (larger, purple)
-        graphics.fillStyle(0x9933ff, 1);
-        graphics.beginPath();
-        graphics.moveTo(20, 40);
-        graphics.lineTo(40, 0);
-        graphics.lineTo(20, 10);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Draw wing details
-        graphics.fillStyle(0x7700cc, 1);
-        graphics.fillRect(15, 15, 10, 20);
-        
-        graphics.generateTexture('eliteEnemy', 40, 40);
-    }
-
-    createDarkRedEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw dark red enemy ship with white outline
-        graphics.lineStyle(2, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 32);
-        graphics.lineTo(32, 0);
-        graphics.lineTo(16, 8);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0xaa0000, 1);
-        graphics.fillPath();
-        
-        // Draw engine glow
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(8, 4, 2);
-        graphics.fillCircle(24, 4, 2);
-        
-        graphics.generateTexture('enemyDarkRed', 32, 32);
-    }
-
-    createPulsingRedEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw pulsing red enemy ship with thicker white outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 32);
-        graphics.lineTo(32, 0);
-        graphics.lineTo(16, 8);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0xaa0000, 1);
-        graphics.fillPath();
-        
-        // Draw engine glow
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(8, 4, 2);
-        graphics.fillCircle(24, 4, 2);
-        
-        graphics.generateTexture('enemyPulsingRed', 32, 32);
-    }
-
-    createDarkPurpleEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw dark purple elite enemy ship with white outline
-        graphics.lineStyle(2, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(20, 40);
-        graphics.lineTo(40, 0);
-        graphics.lineTo(20, 10);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0x660099, 1);
-        graphics.fillPath();
-        
-        // Draw wing details
-        graphics.fillStyle(0x440066, 1);
-        graphics.fillRect(15, 15, 10, 20);
-        
-        graphics.generateTexture('enemyDarkPurple', 40, 40);
-    }
-
-    createPulsingPurpleEnemyTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw pulsing purple elite enemy ship with thicker white outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(20, 40);
-        graphics.lineTo(40, 0);
-        graphics.lineTo(20, 10);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0x660099, 1);
-        graphics.fillPath();
-        
-        // Draw wing details
-        graphics.fillStyle(0x440066, 1);
-        graphics.fillRect(15, 15, 10, 20);
-        
-        graphics.generateTexture('enemyPulsingPurple', 40, 40);
-    }
-
-    createBossTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw boss ship (massive)
-        graphics.fillStyle(0x666666, 1);
-        graphics.beginPath();
-        graphics.moveTo(40, 80);
-        graphics.lineTo(80, 0);
-        graphics.lineTo(40, 20);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        // Draw cannons
-        graphics.fillStyle(0x444444, 1);
-        graphics.fillRect(10, 30, 15, 40);
-        graphics.fillRect(55, 30, 15, 40);
-        
-        // Draw core
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(40, 40, 15);
-        
-        graphics.generateTexture('boss', 80, 80);
-    }
-
-    createDarkBossTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw dark boss ship (massive, darker shade) with white outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(40, 80);
-        graphics.lineTo(80, 0);
-        graphics.lineTo(40, 20);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0x333333, 1);
-        graphics.fillPath();
-        
-        // Draw cannons
-        graphics.fillStyle(0x222222, 1);
-        graphics.fillRect(10, 30, 15, 40);
-        graphics.fillRect(55, 30, 15, 40);
-        
-        // Draw core (darker red)
-        graphics.fillStyle(0xaa0000, 1);
-        graphics.fillCircle(40, 40, 15);
-        
-        graphics.generateTexture('bossDark', 80, 80);
-    }
-
-    createPulsingBossTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw pulsing boss ship (massive, same as dark boss) with thicker white outline
-        graphics.lineStyle(4, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(40, 80);
-        graphics.lineTo(80, 0);
-        graphics.lineTo(40, 20);
-        graphics.lineTo(0, 0);
-        graphics.closePath();
-        graphics.strokePath();
-        
-        graphics.fillStyle(0x333333, 1);
-        graphics.fillPath();
-        
-        // Draw cannons
-        graphics.fillStyle(0x222222, 1);
-        graphics.fillRect(10, 30, 15, 40);
-        graphics.fillRect(55, 30, 15, 40);
-        
-        // Draw core (darker red)
-        graphics.fillStyle(0xaa0000, 1);
-        graphics.fillCircle(40, 40, 15);
-        
-        graphics.generateTexture('bossPulsing', 80, 80);
-    }
-
-    createBulletTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw bullet (cyan laser)
-        graphics.fillStyle(0x00ffff, 1);
-        graphics.fillRect(3, 0, 6, 16);
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillRect(5, 2, 2, 12);
-        
-        graphics.generateTexture('bullet', 12, 16);
-    }
-
-    createEnemyBulletTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw enemy bullet (red plasma)
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillRect(3, 0, 6, 12);
-        graphics.fillStyle(0xff6600, 1);
-        graphics.fillRect(5, 2, 2, 8);
-        
-        graphics.generateTexture('enemyBullet', 12, 12);
-    }
-
-    createPowerupShieldTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw shield powerup
-        graphics.fillStyle(0x0088ff, 1);
-        graphics.fillCircle(16, 16, 14);
-        graphics.fillStyle(0x004488, 1);
-        graphics.fillCircle(16, 16, 10);
-        graphics.fillStyle(0x00ffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 6);
-        graphics.lineTo(26, 16);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(6, 16);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        graphics.generateTexture('powerupShield', 32, 32);
-    }
-
-    createPowerupRapidTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw rapid fire powerup
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(16, 16, 14);
-        graphics.fillStyle(0x888800, 1);
-        graphics.fillRect(8, 10, 16, 4);
-        graphics.fillRect(8, 18, 16, 4);
-        
-        graphics.generateTexture('powerupRapid', 32, 32);
-    }
-
-    createPowerupMultiTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw multi-shot powerup
-        graphics.fillStyle(0x00ff00, 1);
-        graphics.fillCircle(16, 16, 14);
-        graphics.fillStyle(0x006600, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 6);
-        graphics.lineTo(22, 22);
-        graphics.lineTo(16, 18);
-        graphics.lineTo(10, 22);
-        graphics.closePath();
-        graphics.fillPath();
-        
-        graphics.generateTexture('powerupMulti', 32, 32);
-    }
-
-    createPowerupLasersTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw lasers powerup - green circle with laser beam icons
-        graphics.fillStyle(0x00ff00, 1);
-        graphics.fillCircle(16, 16, 14);
-        
-        // Draw two diagonal laser beams
-        graphics.lineStyle(3, 0xccffcc, 1);
-        // Up-left beam
-        graphics.beginPath();
-        graphics.moveTo(10, 22);
-        graphics.lineTo(4, 10);
-        graphics.strokePath();
-        // Up-right beam
-        graphics.beginPath();
-        graphics.moveTo(22, 22);
-        graphics.lineTo(28, 10);
-        graphics.strokePath();
-        
-        // Glow effect on beams
-        graphics.lineStyle(1, 0xffffff, 0.8);
-        graphics.beginPath();
-        graphics.moveTo(10, 22);
-        graphics.lineTo(4, 10);
-        graphics.strokePath();
-        graphics.beginPath();
-        graphics.moveTo(22, 22);
-        graphics.lineTo(28, 10);
-        graphics.strokePath();
-        
-        graphics.generateTexture('powerupLasers', 32, 32);
-    }
-
-    createHealthPickupTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // White background circle
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillCircle(16, 16, 14);
-        
-        // Red cross
-        graphics.fillStyle(0xff0000, 1);
-        // Vertical bar
-        graphics.fillRect(12, 6, 8, 20);
-        // Horizontal bar
-        graphics.fillRect(6, 12, 20, 8);
-        
-        graphics.generateTexture('healthPickup', 32, 32);
-    }
-
-    createStarTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw star
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillCircle(2, 2, 2);
-        
-        graphics.generateTexture('star', 4, 4);
-    }
-
-    createParticleTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw explosion particle
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(4, 4, 4);
-        graphics.fillStyle(0xff6600, 1);
-        graphics.fillCircle(4, 4, 2);
-        
-        graphics.generateTexture('particle', 8, 8);
-    }
-
-    // Gem textures
-    createGemSmallTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        // White outline
-        graphics.lineStyle(2, 0xffffff, 1);
-        graphics.strokeCircle(9, 9, 7);
-        // Blue gem
-        graphics.fillStyle(0x00aaff, 1);
-        graphics.fillCircle(9, 9, 6);
-        // Inner highlight
-        graphics.fillStyle(0x88ccff, 1);
-        graphics.fillCircle(8, 8, 3);
-        graphics.generateTexture('gemSmall', 18, 18);
-    }
-
-    createGemMediumTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        // White outline
-        graphics.lineStyle(2, 0xffffff, 1);
-        graphics.strokeCircle(13, 13, 10);
-        // Green gem
-        graphics.fillStyle(0x00ff00, 1);
-        graphics.fillCircle(13, 13, 9);
-        // Inner highlight
-        graphics.fillStyle(0x88ff88, 1);
-        graphics.fillCircle(11, 11, 4);
-        graphics.generateTexture('gemMedium', 26, 26);
-    }
-
-    createGemLargeTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        // White outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        graphics.strokeCircle(17, 17, 13);
-        // Gold gem
-        graphics.fillStyle(0xffd700, 1);
-        graphics.fillCircle(17, 17, 12);
-        // Inner highlight
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(14, 14, 5);
-        graphics.generateTexture('gemLarge', 34, 34);
-    }
-
-    // Upgrade icon textures
-    createUpgradePiercingTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x00ffff, 1);
-        graphics.fillRect(4, 6, 24, 4);
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(24, 8, 6);
-        graphics.fillStyle(0x00ffff, 1);
-        graphics.fillRect(24, 6, 12, 4);
-        graphics.generateTexture('upgradePiercing', 32, 16);
-    }
-
-    createUpgradeDronesTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x00aaff, 1);
-        graphics.fillCircle(16, 16, 6);
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(4, 4, 3);
-        graphics.fillCircle(28, 4, 3);
-        graphics.fillCircle(4, 28, 3);
-        graphics.fillCircle(28, 28, 3);
-        graphics.generateTexture('upgradeDrones', 32, 32);
-    }
-
-    createUpgradeRearTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xff6600, 1);
-        graphics.fillTriangle(16, 24, 8, 8, 24, 8);
-        graphics.generateTexture('upgradeRear', 32, 32);
-    }
-
-    createUpgradeSideCannonTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xff6600, 1);
-        // Left pointing triangle (tip on left)
-        graphics.fillTriangle(6, 16, 12, 8, 12, 24);
-        // Right pointing triangle (tip on right, with space)
-        graphics.fillTriangle(26, 16, 20, 8, 20, 24);
-        graphics.generateTexture('upgradeSidecannon', 32, 32);
-    }
-
-    createUpgradeExplosiveTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xffff00, 1);
-        graphics.fillCircle(16, 16, 10);
-        graphics.fillStyle(0xff6600, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 2);
-        graphics.lineTo(20, 12);
-        graphics.lineTo(30, 12);
-        graphics.lineTo(22, 18);
-        graphics.lineTo(26, 28);
-        graphics.lineTo(16, 22);
-        graphics.lineTo(6, 28);
-        graphics.lineTo(10, 18);
-        graphics.lineTo(2, 12);
-        graphics.lineTo(12, 12);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.generateTexture('upgradeExplosive', 32, 32);
-    }
-
-    createUpgradeLightningTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xffff00, 1);
-        graphics.beginPath();
-        graphics.moveTo(18, 2);
-        graphics.lineTo(10, 16);
-        graphics.lineTo(16, 16);
-        graphics.lineTo(14, 30);
-        graphics.lineTo(22, 14);
-        graphics.lineTo(16, 14);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.generateTexture('upgradeLightning', 32, 32);
-    }
-
-    createUpgradeVampiricTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        // Draw heart using two circles and a triangle
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(10, 10, 8);
-        graphics.fillCircle(22, 10, 8);
-        graphics.beginPath();
-        graphics.moveTo(4, 12);
-        graphics.lineTo(16, 28);
-        graphics.lineTo(28, 12);
-        graphics.closePath();
-        graphics.fillPath();
-        // Fangs
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillRect(11, 14, 3, 5);
-        graphics.fillRect(18, 14, 3, 5);
-        graphics.generateTexture('upgradeVampiric', 32, 32);
-    }
-
-    createUpgradeShieldTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x0088ff, 1);
-        graphics.fillCircle(16, 18, 12);
-        graphics.fillStyle(0x00ffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 6);
-        graphics.lineTo(26, 16);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(6, 16);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.generateTexture('upgradeShield', 32, 32);
-    }
-
-    createUpgradeMagnetTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xff00ff, 1);
-        graphics.fillRect(8, 4, 6, 12);
-        graphics.fillRect(18, 4, 6, 12);
-        graphics.fillRect(6, 16, 20, 4);
-        graphics.fillStyle(0xaa00aa, 1);
-        graphics.fillCircle(16, 26, 4);
-        graphics.generateTexture('upgradeMagnet', 32, 32);
-    }
-
-    createUpgradeThornsTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x00aa00, 1);
-        graphics.fillCircle(16, 16, 12);
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillTriangle(16, 2, 12, 10, 20, 10);
-        graphics.fillTriangle(16, 30, 12, 22, 20, 22);
-        graphics.fillTriangle(2, 16, 10, 12, 10, 20);
-        graphics.fillTriangle(30, 16, 22, 12, 22, 20);
-        graphics.generateTexture('upgradeThorns', 32, 32);
-    }
-
-    createUpgradeGarlicTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xeeeeee, 1);
-        graphics.fillCircle(16, 16, 12);
-        graphics.fillStyle(0xdddddd, 1);
-        graphics.fillCircle(16, 10, 4);
-        graphics.fillCircle(12, 14, 3);
-        graphics.fillCircle(20, 14, 3);
-        graphics.fillCircle(14, 20, 3);
-        graphics.fillCircle(18, 20, 3);
-        graphics.fillStyle(0x9966ff, 0.6);
-        graphics.lineStyle(2, 0x9966ff, 0.8);
-        graphics.strokeCircle(16, 16, 14);
-        graphics.generateTexture('upgradeGarlic', 32, 32);
-    }
-
-    createUpgradeNukeTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xff6600, 1);
-        graphics.fillCircle(16, 16, 14);
-        graphics.fillStyle(0xffff00, 1);
-        graphics.beginPath();
-        graphics.moveTo(16, 4);
-        graphics.lineTo(20, 12);
-        graphics.lineTo(28, 12);
-        graphics.lineTo(22, 18);
-        graphics.lineTo(24, 26);
-        graphics.lineTo(16, 22);
-        graphics.lineTo(8, 26);
-        graphics.lineTo(10, 18);
-        graphics.lineTo(4, 12);
-        graphics.lineTo(12, 12);
-        graphics.closePath();
-        graphics.fillPath();
-        // Draw Z key shape
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillRect(10, 10, 12, 3);
-        graphics.fillRect(10, 10, 3, 3);
-        graphics.fillRect(19, 19, 3, 3);
-        graphics.fillRect(10, 19, 12, 3);
-        graphics.generateTexture('upgradeNuke', 32, 32);
-    }
-
-    createUpgradeCloneTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0x00aaff, 1);
-        graphics.beginPath();
-        graphics.moveTo(8, 0);
-        graphics.lineTo(16, 16);
-        graphics.lineTo(8, 12);
-        graphics.lineTo(0, 16);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.fillStyle(0x0088cc, 1);
-        graphics.beginPath();
-        graphics.moveTo(24, 0);
-        graphics.lineTo(32, 16);
-        graphics.lineTo(24, 12);
-        graphics.lineTo(16, 16);
-        graphics.closePath();
-        graphics.fillPath();
-        graphics.generateTexture('upgradeClone', 32, 16);
-    }
-
-    createUpgradeGiantTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xffaa00, 1);
-        graphics.fillRect(10, 4, 12, 24);
-        graphics.fillRect(6, 8, 20, 4);
-        graphics.fillStyle(0xffffff, 1);
-        graphics.fillTriangle(16, 2, 10, 8, 22, 8);
-        graphics.generateTexture('upgradeGiant', 32, 32);
-    }
-
-    createUpgradeBerserkerTexture() {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillCircle(16, 16, 12);
-        graphics.fillStyle(0xffaa00, 1);
-        graphics.fillCircle(10, 12, 3);
-        graphics.fillCircle(22, 12, 3);
-        graphics.lineStyle(2, 0xffffff, 1);
-        graphics.beginPath();
-        graphics.moveTo(8, 22);
-        graphics.lineTo(16, 26);
-        graphics.lineTo(24, 22);
-        graphics.strokePath();
-        graphics.generateTexture('upgradeBerserker', 32, 32);
-    }
-
-    create() {
-        this.scene.start('IntroScene');
-    }
-}
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -1290,25 +166,10 @@ class GameScene extends Phaser.Scene {
         this.mKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
         this.pKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
         
-        // Toggle god mode with P
-        this.pKey.on('down', () => {
-            this.godMode = !this.godMode;
-            this.showMessage(this.godMode ? 'GOD MODE ON' : 'GOD MODE OFF', this.godMode ? '#ffff00' : '#ffffff');
-        });
-        
-        // Add score with O (debug)
-        this.oKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O);
-        this.oKey.on('down', () => {
-            this.score += 500;
-            this.showMessage('+500 SCORE', '#ffff00');
-        });
-        
         this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-        
-        // ESC to pause
-        this.input.keyboard.on('keydown-ESC', () => {
-            this.togglePause();
-        });
+        this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+
+        this.setupDebugControls();
 
         // Setup collisions
         this.setupCollisions();
@@ -1333,163 +194,17 @@ class GameScene extends Phaser.Scene {
     }
 
     createPlayerTexture(shapeIndex, shipColor, engineColor) {
-        // Remove existing player texture to prevent overlap
         if (this.textures.exists('player')) {
             this.textures.remove('player');
         }
-        
         const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        
-        // Draw ship outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        
-        // Draw ship body based on shape
-        graphics.fillStyle(shipColor, 1);
-        
-        switch(shapeIndex) {
-            case 0: // Triangle (original)
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(32, 32);
-                graphics.lineTo(16, 26);
-                graphics.lineTo(0, 32);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 1: // Wide fighter jet
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(30, 26);
-                graphics.lineTo(28, 32);
-                graphics.lineTo(4, 32);
-                graphics.lineTo(2, 26);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 2: // Cross fighter
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(24, 12);
-                graphics.lineTo(32, 16);
-                graphics.lineTo(24, 20);
-                graphics.lineTo(16, 32);
-                graphics.lineTo(8, 20);
-                graphics.lineTo(0, 16);
-                graphics.lineTo(8, 12);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 3: // Rounded sci-fi
-                graphics.fillStyle(shipColor, 1);
-                graphics.fillCircle(16, 16, 14);
-                graphics.lineStyle(3, 0xffffff, 1);
-                graphics.strokeCircle(16, 16, 14);
-                break;
-            case 4: // Diamond ship
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(26, 16);
-                graphics.lineTo(16, 32);
-                graphics.lineTo(6, 16);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-        }
-        
-        // Draw cockpit
-        graphics.fillStyle(0x88ccff, 1);
-        graphics.fillCircle(16, 14, 5);
-        
-        // Draw engine glow
-        graphics.fillStyle(engineColor, 1);
-        graphics.fillCircle(11, 27, 3);
-        graphics.fillCircle(21, 27, 3);
-        
+        drawShipShape(graphics, shapeIndex, shipColor, engineColor);
         graphics.generateTexture('player', 32, 32);
-        
-        // Also create clone ship with same shape but green
-        this.createCloneShipTexture(shapeIndex);
-    }
 
-    createCloneShipTexture(shapeIndex) {
-        const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-        const shipColor = 0x00ff00;
-        const engineColor = 0xffff00;
-        
-        // Draw ship outline
-        graphics.lineStyle(3, 0xffffff, 1);
-        
-        // Draw ship body based on shape
-        graphics.fillStyle(shipColor, 1);
-        
-        switch(shapeIndex) {
-            case 0: // Triangle (original)
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(32, 32);
-                graphics.lineTo(16, 26);
-                graphics.lineTo(0, 32);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 1: // Wide fighter jet
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(30, 26);
-                graphics.lineTo(28, 32);
-                graphics.lineTo(4, 32);
-                graphics.lineTo(2, 26);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 2: // Cross fighter
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(24, 12);
-                graphics.lineTo(32, 16);
-                graphics.lineTo(24, 20);
-                graphics.lineTo(16, 32);
-                graphics.lineTo(8, 20);
-                graphics.lineTo(0, 16);
-                graphics.lineTo(8, 12);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-            case 3: // Rounded sci-fi
-                graphics.fillStyle(shipColor, 1);
-                graphics.fillCircle(16, 16, 14);
-                graphics.lineStyle(3, 0xffffff, 1);
-                graphics.strokeCircle(16, 16, 14);
-                break;
-            case 4: // Diamond ship
-                graphics.beginPath();
-                graphics.moveTo(16, 0);
-                graphics.lineTo(26, 16);
-                graphics.lineTo(16, 32);
-                graphics.lineTo(6, 16);
-                graphics.closePath();
-                graphics.fillPath();
-                graphics.strokePath();
-                break;
-        }
-        
-        // Draw cockpit
-        graphics.fillStyle(0x88ff88, 1);
-        graphics.fillCircle(16, 14, 5);
-        
-        // Draw engine glow
-        graphics.fillStyle(engineColor, 1);
-        graphics.fillCircle(11, 27, 3);
-        graphics.fillCircle(21, 27, 3);
-        
-        graphics.generateTexture('cloneShip', 32, 32);
+        // Also create clone ship with same shape but green
+        const cloneGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        drawShipShape(cloneGraphics, shapeIndex, 0x00ff00, 0xffff00, { cockpitColor: 0x88ff88 });
+        cloneGraphics.generateTexture('cloneShip', 32, 32);
     }
 
     createPlayer() {
@@ -1565,6 +280,28 @@ class GameScene extends Phaser.Scene {
             blendMode: 'ADD',
             lifespan: 500
         });
+    }
+
+    setupDebugControls() {
+        // God mode (P key)
+        this.pKey.on('down', () => {
+            this.godMode = !this.godMode;
+            this.showMessage(this.godMode ? 'GOD MODE ON' : 'GOD MODE OFF', this.godMode ? '#ffff00' : '#ffffff');
+        });
+
+        // Add score (O key)
+        this.oKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+        this.oKey.on('down', () => {
+            this.score += 500;
+            this.showMessage('+500 SCORE', '#ffff00');
+        });
+
+        // Instant level up button (invisible, bottom left)
+        const debugButton = this.add.text(60, this.gameHeight - 30, '', {
+            fontSize: '16px', fill: '#ffff00', fontFamily: 'Arial', fontStyle: 'bold',
+            backgroundColor: 'rgba(0,0,0,0)', padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        debugButton.on('pointerdown', () => this.levelUp());
     }
 
     setupCollisions() {
@@ -1682,20 +419,6 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.nukeCooldownText.setVisible(false);
         
-        // Debug button (bottom left) - instant level up (invisible but clickable)
-        this.debugButton = this.add.text(60, this.gameHeight - 30, '', {
-            fontSize: '16px',
-            fill: '#ffff00',
-            fontFamily: 'Arial',
-            fontStyle: 'bold',
-            backgroundColor: 'rgba(0,0,0,0)',
-            padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
-        this.debugButton.setInteractive({ useHandCursor: true });
-        this.debugButton.on('pointerdown', () => {
-            this.levelUp();
-        });
-
         // Mode indicator (only show slots in hard mode, on the right side)
         if (this.gameMode === 'hard') {
             // Upgrade slots indicator - right side, above upgrade list
@@ -1934,76 +657,7 @@ class GameScene extends Phaser.Scene {
         // Update clones
         this.updateClones();
 
-        // Garlic aura - only for main player
-        if (this.upgrades.garlic > 0 && this.player.active) {
-            const auraRadius = 40 + (this.upgrades.garlic * 25); // 65, 90, 115, 140, 165
-            const damagePerTick = 1 + this.upgrades.garlic; // 2, 3, 4, 5, 6 damage every 0.5s
-            
-            // Create aura visual if needed
-            if (!this.garlicAura) {
-                this.garlicAura = this.add.circle(this.player.x, this.player.y, auraRadius, 0x9966ff, 0.2);
-            } else {
-                this.garlicAura.setRadius(auraRadius);
-            }
-            
-            // Deal damage every 0.5 seconds
-            if (time - this.garlicLastDamageTime > 500) {
-                this.enemies.children.iterate((enemy) => {
-                    if (enemy && enemy.active) {
-                        const dx = enemy.x - this.player.x;
-                        const dy = enemy.y - this.player.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < auraRadius) {
-                            enemy.health -= damagePerTick;
-                            if (enemy.health <= 0) {
-                                this.destroyEnemy(enemy);
-                            }
-                        }
-                    }
-                });
-                
-                // Also damage asteroids
-                this.asteroids.children.iterate((asteroid) => {
-                    if (asteroid && asteroid.active) {
-                        const dx = asteroid.x - this.player.x;
-                        const dy = asteroid.y - this.player.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < auraRadius) {
-                            asteroid.health -= damagePerTick;
-                            if (asteroid.health <= 0) {
-                                this.destroyAsteroid(asteroid, false, null);
-                            }
-                        }
-                    }
-                });
-                
-                // Also damage boss
-                this.boss.children.iterate((boss) => {
-                    if (boss && boss.active) {
-                        const dx = boss.x - this.player.x;
-                        const dy = boss.y - this.player.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        if (dist < auraRadius) {
-                            boss.health -= damagePerTick;
-                            if (boss.health <= 0) {
-                                this.createExplosion(boss.x, boss.y, 20);
-                                if (boss.gemType) {
-                                    this.spawnGem(boss.x, boss.y, boss.gemType);
-                                }
-                                if (boss.healthBarBg) boss.healthBarBg.destroy();
-                                if (boss.healthBar) boss.healthBar.destroy();
-                                this.score += boss.scoreValue;
-                                boss.destroy();
-                            }
-                        }
-                    }
-                });
-                this.garlicLastDamageTime = time;
-            }
-        } else if (this.garlicAura) {
-            this.garlicAura.destroy();
-            this.garlicAura = null;
-        }
+        this.updateGarlicAura(time);
 
         // Spawn enemies
         if (time > this.lastEnemySpawn + this.enemySpawnRate) {
@@ -2151,6 +805,44 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    updateGarlicAura(time) {
+        if (this.upgrades.garlic <= 0 || !this.player.active) {
+            if (this.garlicAura) {
+                this.garlicAura.destroy();
+                this.garlicAura = null;
+            }
+            return;
+        }
+
+        const auraRadius = 40 + (this.upgrades.garlic * 25);
+        const damagePerTick = 1 + this.upgrades.garlic;
+
+        if (!this.garlicAura) {
+            this.garlicAura = this.add.circle(this.player.x, this.player.y, auraRadius, 0x9966ff, 0.2);
+        } else {
+            this.garlicAura.setRadius(auraRadius);
+        }
+
+        if (time - this.garlicLastDamageTime > 500) {
+            const damageInRange = (group, onKill) => {
+                group.children.iterate((target) => {
+                    if (!target || !target.active) return;
+                    const dx = target.x - this.player.x;
+                    const dy = target.y - this.player.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < auraRadius) {
+                        target.health -= damagePerTick;
+                        if (target.health <= 0) onKill(target);
+                    }
+                });
+            };
+
+            damageInRange(this.enemies, (e) => this.destroyEnemy(e));
+            damageInRange(this.asteroids, (a) => this.destroyAsteroid(a, false, null));
+            damageInRange(this.boss, (b) => this.destroyBoss(b));
+            this.garlicLastDamageTime = time;
+        }
+    }
+
     updateEnemyScaling(time) {
         const elapsed = time - this.gameStartTime - (this.pauseTimeOffset || 0);
         
@@ -2184,14 +876,8 @@ class GameScene extends Phaser.Scene {
         }
     }
     
-    shoot() {
-        const x = this.player.x;
-        const y = this.player.y - 20;
-        
-        // Apply damage multiplier from giant mode
-        let damageMult = 1 + (this.upgrades.giant * 0.25);
-        
-        // Apply berserker bonus based on health
+    getDamageMultiplier() {
+        let mult = 1 + (this.upgrades.giant * 0.25);
         if (this.upgrades.berserker > 0) {
             const healthPercent = this.health / this.maxHealth;
             let berserkerBonus = 0;
@@ -2199,8 +885,72 @@ class GameScene extends Phaser.Scene {
             if (healthPercent <= 0.6) berserkerBonus += 0.25;
             if (healthPercent <= 0.4) berserkerBonus += 0.25;
             if (healthPercent <= 0.2) berserkerBonus += 0.25;
-            damageMult += berserkerBonus * this.upgrades.berserker;
+            mult += berserkerBonus * this.upgrades.berserker;
         }
+        return mult;
+    }
+
+    handleExplosiveRound(bullet, x, y, excludeTarget = null) {
+        if (!bullet.explosive) return;
+        const radius = bullet.explosiveRadius || 70;
+        const explosionDamage = bullet.explosiveDamage || 3;
+        this.createExplosion(x, y, 15 + explosionDamage * 2, radius, true);
+
+        const ring = this.add.circle(x, y, radius, 0xff4400, 0.3);
+        this.tweens.add({
+            targets: ring,
+            alpha: 0,
+            scale: 1.5,
+            duration: 200,
+            onComplete: () => ring.destroy()
+        });
+
+        this.enemies.children.iterate((enemy) => {
+            if (enemy && enemy.active && enemy !== excludeTarget) {
+                const dx = enemy.x - x;
+                const dy = enemy.y - y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < radius) {
+                    enemy.health -= explosionDamage;
+                    if (enemy.health <= 0) {
+                        this.destroyEnemy(enemy);
+                    }
+                }
+            }
+        });
+    }
+
+    addPulsingAnimation(target) {
+        this.tweens.add({
+            targets: target,
+            alpha: 0.3,
+            duration: 300,
+            yoyo: true,
+            repeat: -1
+        });
+        const tintObj = { value: 1 };
+        this.tweens.add({
+            targets: tintObj,
+            value: 0,
+            duration: 300,
+            yoyo: true,
+            repeat: -1,
+            onUpdate: () => {
+                if (!target.active) return;
+                const tintValue = Phaser.Display.Color.ObjectToColor({
+                    r: Math.floor(tintObj.value * 255),
+                    g: 255,
+                    b: 255
+                }).color;
+                target.setTint(tintValue);
+            }
+        });
+    }
+
+    shoot() {
+        const x = this.player.x;
+        const y = this.player.y - 20;
+        const damageMult = this.getDamageMultiplier();
 
         if (this.multiShotActive) {
             // 3-way spread shot
@@ -2254,52 +1004,13 @@ class GameScene extends Phaser.Scene {
     fireRearTurret() {
         const x = this.player.x;
         const y = this.player.y + 20;
+        const damageMult = this.getDamageMultiplier();
         
-        // Apply damage multiplier from giant mode
-        let damageMult = 1 + (this.upgrades.giant * 0.25);
-        
-        // Apply berserker bonus based on health
-        if (this.upgrades.berserker > 0) {
-            const healthPercent = this.health / this.maxHealth;
-            let berserkerBonus = 0;
-            if (healthPercent <= 0.8) berserkerBonus += 0.25;
-            if (healthPercent <= 0.6) berserkerBonus += 0.25;
-            if (healthPercent <= 0.4) berserkerBonus += 0.25;
-            if (healthPercent <= 0.2) berserkerBonus += 0.25;
-            damageMult += berserkerBonus * this.upgrades.berserker;
-        }
-        
-        // Single shot backwards (no temporary upgrades affect rear turret)
-        const bullet = this.bullets.get(x, y, 'bullet');
-        if (bullet) {
-            bullet.setActive(true);
-            bullet.setVisible(true);
-            bullet.setVelocity(0, 500);
-            bullet.damage = damageMult;
-            bullet.pierceCount = this.upgrades.piercing * 2;
-            bullet.explosive = this.upgrades.explosive > 0;
-            bullet.explosiveRadius = 40 + (this.upgrades.explosive * 30);
-            bullet.explosiveDamage = this.upgrades.explosive * 3;
-            bullet.chainLightning = this.upgrades.lightning > 0;
-            bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-            bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
-        }
+        this.createBullet(x, y, 0, 500, damageMult);
     }
     
     fireSideCannons() {
-        // Calculate damage multiplier (same as rear turret)
-        let damageMult = 1 + (this.upgrades.giant * 0.25);
-        
-        // Apply berserker bonus based on health
-        if (this.upgrades.berserker > 0) {
-            const healthPercent = this.health / this.maxHealth;
-            let berserkerBonus = 0;
-            if (healthPercent <= 0.8) berserkerBonus += 0.25;
-            if (healthPercent <= 0.6) berserkerBonus += 0.25;
-            if (healthPercent <= 0.4) berserkerBonus += 0.25;
-            if (healthPercent <= 0.2) berserkerBonus += 0.25;
-            damageMult += berserkerBonus * this.upgrades.berserker;
-        }
+        const damageMult = this.getDamageMultiplier();
         
         const y = this.player.y;
         
@@ -2309,28 +1020,11 @@ class GameScene extends Phaser.Scene {
         const rightX = this.player.x + 20;
         
         // Fire left cannon (always fires at level 1)
-        this.createSideBullet(leftX, y, -500, 0, damageMult);
-        
+        this.createBullet(leftX, y, -500, 0, damageMult);
+
         // Fire right cannon (only at level 2)
         if (this.upgrades.sidecannon >= 2) {
-            this.createSideBullet(rightX, y, 500, 0, damageMult);
-        }
-    }
-    
-    createSideBullet(x, y, vx, vy, damageMult) {
-        const bullet = this.bullets.get(x, y, 'bullet');
-        if (bullet) {
-            bullet.setActive(true);
-            bullet.setVisible(true);
-            bullet.setVelocity(vx, vy);
-            bullet.damage = damageMult;
-            bullet.pierceCount = this.upgrades.piercing * 2;
-            bullet.explosive = this.upgrades.explosive > 0;
-            bullet.explosiveRadius = 40 + (this.upgrades.explosive * 30);
-            bullet.explosiveDamage = this.upgrades.explosive * 3;
-            bullet.chainLightning = this.upgrades.lightning > 0;
-            bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-            bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
+            this.createBullet(rightX, y, 500, 0, damageMult);
         }
     }
     
@@ -2357,7 +1051,7 @@ class GameScene extends Phaser.Scene {
         
         // Update drone positions and shooting
         let index = 0;
-        const droneDamageMult = 1 + (this.upgrades.giant * 0.25);
+        const droneDamageMult = this.getDamageMultiplier();
         this.drones.children.iterate((drone) => {
             if (drone && drone.active) {
                 // Orbit around player
@@ -2368,22 +1062,7 @@ class GameScene extends Phaser.Scene {
                 // Fire outward
                 if (time % 500 < 20) {
                     const angle = drone.orbitAngle;
-                    const vx = Math.cos(angle) * 300;
-                    const vy = Math.sin(angle) * 300;
-                    const bullet = this.bullets.get(drone.x, drone.y, 'bullet');
-                    if (bullet) {
-                        bullet.setActive(true);
-                        bullet.setVisible(true);
-                        bullet.setVelocity(vx, vy);
-                        bullet.damage = droneDamageMult;
-                        bullet.pierceCount = this.upgrades.piercing * 2;
-                        bullet.explosive = this.upgrades.explosive > 0;
-                        bullet.explosiveRadius = 40 + (this.upgrades.explosive * 30);
-                        bullet.explosiveDamage = this.upgrades.explosive * 3;
-                        bullet.chainLightning = this.upgrades.lightning > 0;
-                        bullet.lightningJumps = 1 + (this.upgrades.lightning * 2);
-                        bullet.lightningRange = 150 + (this.upgrades.lightning * 50);
-                    }
+                    this.createBullet(drone.x, drone.y, Math.cos(angle) * 300, Math.sin(angle) * 300, droneDamageMult);
                 }
                 index++;
             }
@@ -2464,12 +1143,7 @@ class GameScene extends Phaser.Scene {
             if (boss && boss.active) {
                 boss.health -= 25;
                 if (boss.health <= 0) {
-                    this.createExplosion(boss.x, boss.y, 20);
-                    this.spawnGem(boss.x, boss.y, 'large');
-                    if (boss.healthBarBg) boss.healthBarBg.destroy();
-                    if (boss.healthBar) boss.healthBar.destroy();
-                    boss.destroy();
-                    this.score += boss.scoreValue;
+                    this.destroyBoss(boss);
                 }
             }
         });
@@ -2516,205 +1190,30 @@ class GameScene extends Phaser.Scene {
 
     spawnEnemy() {
         const x = Phaser.Math.Between(20, this.gameWidth - 20);
-        
-        // Determine spawn probabilities based on score
-        const score = this.score;
-        let spawnType = '';
-        const roll = Phaser.Math.Between(1, 100);
-        
-        if (score < 1000) {
-            // 0-999: 95% Light Red, 5% Light Purple
-            spawnType = roll <= 95 ? 'lightRed' : 'lightPurple';
-        } else if (score < 2000) {
-            // 1000-1999: 50% Light Red, 20% Dark Red, 20% Light Purple, 10% Dark Purple
-            if (roll <= 50) spawnType = 'lightRed';
-            else if (roll <= 70) spawnType = 'darkRed';
-            else if (roll <= 90) spawnType = 'lightPurple';
-            else spawnType = 'darkPurple';
-        } else if (score < 3000) {
-            // 2000-2999: 35% Light Red, 30% Dark Red, 20% Light Purple, 15% Dark Purple
-            if (roll <= 35) spawnType = 'lightRed';
-            else if (roll <= 65) spawnType = 'darkRed';
-            else if (roll <= 85) spawnType = 'lightPurple';
-            else spawnType = 'darkPurple';
-        } else if (score < 4000) {
-            // 3000-3999: 20% Light Red, 30% Dark Red, 5% Pulsing Red, 20% Light Purple, 20% Dark Purple, 5% Pulsing Purple
-            if (roll <= 20) spawnType = 'lightRed';
-            else if (roll <= 50) spawnType = 'darkRed';
-            else if (roll <= 55) spawnType = 'pulsingRed';
-            else if (roll <= 75) spawnType = 'lightPurple';
-            else if (roll <= 95) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else if (score < 5000) {
-            // 4000-4999: 15% Light Red, 25% Dark Red, 10% Pulsing Red, 15% Light Purple, 25% Dark Purple, 10% Pulsing Purple
-            if (roll <= 15) spawnType = 'lightRed';
-            else if (roll <= 40) spawnType = 'darkRed';
-            else if (roll <= 50) spawnType = 'pulsingRed';
-            else if (roll <= 65) spawnType = 'lightPurple';
-            else if (roll <= 90) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else if (score < 6000) {
-            // 5000-5999: 10% Light Red, 20% Dark Red, 15% Pulsing Red, 15% Light Purple, 30% Dark Purple, 10% Pulsing Purple
-            if (roll <= 10) spawnType = 'lightRed';
-            else if (roll <= 30) spawnType = 'darkRed';
-            else if (roll <= 45) spawnType = 'pulsingRed';
-            else if (roll <= 60) spawnType = 'lightPurple';
-            else if (roll <= 90) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else if (score < 7000) {
-            // 6000-6999: 5% Light Red, 15% Dark Red, 20% Pulsing Red, 15% Light Purple, 30% Dark Purple, 15% Pulsing Purple
-            if (roll <= 5) spawnType = 'lightRed';
-            else if (roll <= 20) spawnType = 'darkRed';
-            else if (roll <= 40) spawnType = 'pulsingRed';
-            else if (roll <= 55) spawnType = 'lightPurple';
-            else if (roll <= 85) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else if (score < 8000) {
-            // 7000-7999: 5% Light Red, 12% Dark Red, 20% Pulsing Red, 15% Light Purple, 28% Dark Purple, 20% Pulsing Purple
-            if (roll <= 5) spawnType = 'lightRed';
-            else if (roll <= 17) spawnType = 'darkRed';
-            else if (roll <= 37) spawnType = 'pulsingRed';
-            else if (roll <= 52) spawnType = 'lightPurple';
-            else if (roll <= 80) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else if (score < 9000) {
-            // 8000-8999: 5% Light Red, 10% Dark Red, 20% Pulsing Red, 15% Light Purple, 25% Dark Purple, 25% Pulsing Purple
-            if (roll <= 5) spawnType = 'lightRed';
-            else if (roll <= 15) spawnType = 'darkRed';
-            else if (roll <= 35) spawnType = 'pulsingRed';
-            else if (roll <= 50) spawnType = 'lightPurple';
-            else if (roll <= 75) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        } else {
-            // 9000+: 5% Light Red, 10% Dark Red, 20% Pulsing Red, 15% Light Purple, 20% Dark Purple, 30% Pulsing Purple
-            if (roll <= 5) spawnType = 'lightRed';
-            else if (roll <= 15) spawnType = 'darkRed';
-            else if (roll <= 35) spawnType = 'pulsingRed';
-            else if (roll <= 50) spawnType = 'lightPurple';
-            else if (roll <= 70) spawnType = 'darkPurple';
-            else spawnType = 'pulsingPurple';
-        }
-        
-        // Create enemy based on type
-        let enemy;
-        const isElite = spawnType.includes('Purple');
-        
-        if (spawnType === 'lightRed') {
-            enemy = this.enemies.create(x, -20, 'enemy');
-            enemy.health = 1;
-            enemy.scoreValue = 10;
-            enemy.gemType = 'small';
-            enemy.isElite = false;
-            enemy.bulletDamage = 10;
-            enemy.body.setCircle(15);
-        } else if (spawnType === 'darkRed') {
-            enemy = this.enemies.create(x, -20, 'enemyDarkRed');
-            enemy.health = this.gameMode === 'hard' ? 8 : 5;
-            enemy.scoreValue = 20;
-            enemy.gemType = 'small';
-            enemy.isElite = false;
-            enemy.bulletDamage = 10;
-            enemy.body.setCircle(15);
-        } else if (spawnType === 'pulsingRed') {
-            enemy = this.enemies.create(x, -20, 'enemyPulsingRed');
-            enemy.health = this.gameMode === 'hard' ? 15 : 10;
-            enemy.scoreValue = 30;
-            enemy.gemType = 'small';
-            enemy.isElite = false;
-            enemy.bulletDamage = 10;
-            enemy.body.setCircle(15);
-            // Alpha pulsing animation
-            this.tweens.add({
-                targets: enemy,
-                alpha: 0.3,
-                duration: 300,
-                yoyo: true,
-                repeat: -1
-            });
-            // Outline color pulsing (white to cyan)
-            const tintObj = { value: 1 };
-            this.tweens.add({
-                targets: tintObj,
-                value: 0,
-                duration: 300,
-                yoyo: true,
-                repeat: -1,
-                onUpdate: () => {
-                    const tintValue = Phaser.Display.Color.ObjectToColor({
-                        r: Math.floor(tintObj.value * 255),
-                        g: 255,
-                        b: 255
-                    }).color;
-                    enemy.setTint(tintValue);
-                }
-            });
-        } else if (spawnType === 'lightPurple') {
-            enemy = this.enemies.create(x, -40, 'eliteEnemy');
-            enemy.health = this.gameMode === 'hard' ? 8 : 5;
-            enemy.scoreValue = 50;
-            enemy.gemType = 'medium';
-            enemy.isElite = true;
-            enemy.bulletDamage = 8;
-            enemy.body.setCircle(19);
-        } else if (spawnType === 'darkPurple') {
-            enemy = this.enemies.create(x, -40, 'enemyDarkPurple');
-            enemy.health = this.gameMode === 'hard' ? 20 : 15;
-            enemy.scoreValue = 75;
-            enemy.gemType = 'medium';
-            enemy.isElite = true;
-            enemy.enemyType = 'darkPurple';
-            enemy.bulletsPerBurst = 1;
-            enemy.body.setCircle(19);
-        } else if (spawnType === 'pulsingPurple') {
-            enemy = this.enemies.create(x, -40, 'enemyPulsingPurple');
-            enemy.health = this.gameMode === 'hard' ? 30 : 25;
-            enemy.scoreValue = 100;
-            enemy.gemType = 'medium';
-            enemy.isElite = true;
-            enemy.bulletDamage = 15;
-            enemy.bulletsPerBurst = 5;
-            enemy.body.setCircle(19);
-            // Alpha pulsing animation
-            this.tweens.add({
-                targets: enemy,
-                alpha: 0.3,
-                duration: 300,
-                yoyo: true,
-                repeat: -1
-            });
-            // Outline color pulsing (white to cyan)
-            const tintObj = { value: 1 };
-            this.tweens.add({
-                targets: tintObj,
-                value: 0,
-                duration: 300,
-                yoyo: true,
-                repeat: -1,
-                onUpdate: () => {
-                    const tintValue = Phaser.Display.Color.ObjectToColor({
-                        r: Math.floor(tintObj.value * 255),
-                        g: 255,
-                        b: 255
-                    }).color;
-                    enemy.setTint(tintValue);
-                }
-            });
-        }
-        
-        // Set common enemy properties
+        const typeName = getSpawnType(this.score);
+        const def = ENEMY_TYPES[typeName];
+
+        const spawnY = def.elite ? -40 : -20;
+        const enemy = this.enemies.create(x, spawnY, def.texture);
+        enemy.health = this.gameMode === 'hard' ? def.hardHealth : def.health;
         enemy.maxHealth = enemy.health;
+        enemy.scoreValue = def.score;
+        enemy.gemType = def.gem;
+        enemy.isElite = def.elite;
+        if (def.damage) enemy.bulletDamage = def.damage;
+        if (def.burstOverride) enemy.bulletsPerBurst = def.burstOverride;
+        if (typeName === 'darkPurple') enemy.enemyType = 'darkPurple';
+        enemy.body.setCircle(def.radius);
+        if (def.pulsing) this.addPulsingAnimation(enemy);
+
         enemy.lastShotTime = this.time.now + 2000;
         enemy.isBurstShooting = false;
         enemy.burstCount = 0;
-        
-        // Set velocity
-        const vy = isElite ? Phaser.Math.Between(100, 150) : Phaser.Math.Between(80, 120);
+
+        const vy = def.elite ? Phaser.Math.Between(100, 150) : Phaser.Math.Between(80, 120);
         enemy.setVelocityY(vy);
-        
-        // Elite enemies drift toward player
-        if (isElite) {
-            const playerX = this.player.x;
-            const direction = playerX > x ? 1 : -1;
+        if (def.elite) {
+            const direction = this.player.x > x ? 1 : -1;
             enemy.setVelocityX(direction * Phaser.Math.Between(30, 50));
         } else {
             enemy.setVelocityX(Phaser.Math.Between(-20, 20));
@@ -2771,32 +1270,8 @@ class GameScene extends Phaser.Scene {
             boss.healthBar = this.add.rectangle(boss.x - 50, boss.y - 50, 100, 10, 0x00ff00);
             boss.healthBar.setOrigin(0, 0.5);
             
-            // Add alpha pulsing animation for 3rd boss
             if (this.bossCount === 3) {
-                this.tweens.add({
-                    targets: boss,
-                    alpha: 0.3,
-                    duration: 300,
-                    yoyo: true,
-                    repeat: -1
-                });
-                // Outline color pulsing (white to cyan)
-                const tintObj = { value: 1 };
-                this.tweens.add({
-                    targets: tintObj,
-                    value: 0,
-                    duration: 300,
-                    yoyo: true,
-                    repeat: -1,
-                    onUpdate: () => {
-                        const tintValue = Phaser.Display.Color.ObjectToColor({
-                            r: Math.floor(tintObj.value * 255),
-                            g: 255,
-                            b: 255
-                        }).color;
-                        boss.setTint(tintValue);
-                    }
-                });
+                this.addPulsingAnimation(boss);
             }
             
             console.log('Boss spawned successfully');
@@ -2856,62 +1331,24 @@ class GameScene extends Phaser.Scene {
         }
     }
     
+    magnetizeGroup(group, magnetRadius) {
+        group.children.iterate((item) => {
+            if (!item || !item.active) return;
+            const dx = this.player.x - item.x;
+            const dy = this.player.y - item.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < magnetRadius) item.magnetized = true;
+            if (item.magnetized) {
+                item.magnetSpeed = Math.min(item.magnetSpeed * 1.001, 600);
+                item.setVelocity((dx / dist) * item.magnetSpeed, (dy / dist) * item.magnetSpeed);
+            }
+        });
+    }
+
     magnetizeGems() {
-        const baseRadius = 100;
-        const magnetRadius = baseRadius * (1 + (this.upgrades.magnet * 0.25));
-        
-        this.gems.children.iterate((gem) => {
-            if (gem && gem.active) {
-                const dx = this.player.x - gem.x;
-                const dy = this.player.y - gem.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                // If within magnet radius, mark as magnetized
-                if (dist < magnetRadius) {
-                    gem.magnetized = true;
-                }
-                
-                // If magnetized, always track toward player and speed up
-                if (gem.magnetized) {
-                    // Slowly increase speed every frame
-                    gem.magnetSpeed = Math.min(gem.magnetSpeed * 1.001, 600);
-                    
-                    // Always move toward player
-                    const speed = gem.magnetSpeed;
-                    gem.setVelocity(
-                        (dx / dist) * speed,
-                        (dy / dist) * speed
-                    );
-                }
-            }
-        });
-        
-        // Also magnetize powerups and health pickups
-        this.powerups.children.iterate((powerup) => {
-            if (powerup && powerup.active) {
-                const dx = this.player.x - powerup.x;
-                const dy = this.player.y - powerup.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                
-                // If within magnet radius, mark as magnetized
-                if (dist < magnetRadius) {
-                    powerup.magnetized = true;
-                }
-                
-                // If magnetized, always track toward player and speed up
-                if (powerup.magnetized) {
-                    // Slowly increase speed every frame
-                    powerup.magnetSpeed = Math.min(powerup.magnetSpeed * 1.001, 600);
-                    
-                    // Always move toward player
-                    const speed = powerup.magnetSpeed;
-                    powerup.setVelocity(
-                        (dx / dist) * speed,
-                        (dy / dist) * speed
-                    );
-                }
-            }
-        });
+        const magnetRadius = 100 * (1 + (this.upgrades.magnet * 0.25));
+        this.magnetizeGroup(this.gems, magnetRadius);
+        this.magnetizeGroup(this.powerups, magnetRadius);
     }
     
     collectGem(player, gem) {
@@ -2949,38 +1386,14 @@ class GameScene extends Phaser.Scene {
         this.upgradeBg.setVisible(true);
         this.levelUpText.setVisible(true);
         
-        // Generate all available upgrades
-        const allUpgrades = [
-            { key: 'piercing', name: 'Piercing Rounds', desc: 'Bullets pass through enemies', max: 3 },
-            { key: 'drones', name: 'Orbital Drones', desc: 'Drones orbit and fire at enemies', max: 5 },
-            { key: 'rear', name: 'Rear Turret', desc: 'Auto-fires behind you', max: 5 },
-            { key: 'explosive', name: 'Explosive Rounds', desc: 'Bullets explode on impact', max: 5 },
-            { key: 'lightning', name: 'Chain Lightning', desc: 'Lightning arcs to nearby enemies', max: 5 },
-            { key: 'vampiric', name: 'Vampiric', desc: 'Heal on kills', max: 3 },
-            { key: 'shield', name: 'Shield Battery', desc: '+1 Max Shield', max: 99 },
-            { key: 'magnet', name: 'Magnetic Field', desc: 'Increased pickup range', max: 99 },
-            { key: 'garlic', name: 'Garlic', desc: 'Damages enemies in aura', max: 5 },
-            { key: 'nuke', name: 'Screen Nuke', desc: 'Press Z to clear screen', max: 5 },
-            { key: 'clone', name: 'Clone Mirror', desc: 'Clone copies your shots', max: 1 },
-            { key: 'giant', name: 'Giant Mode', desc: 'Bigger, stronger, slower', max: 5 },
-            { key: 'berserker', name: 'Berserker', desc: 'More damage at low health', max: 3 },
-            { key: 'sidecannon', name: 'Side Turret', desc: 'Auto-fires to the side', max: 2 }
-        ];
-        
         // Check if we're in hard mode with limited slots
         const isHardMode = this.gameMode === 'hard';
         const canPickNewUpgrade = !isHardMode || this.upgradeSlotsUsed < this.maxUpgradeSlots;
         
-        // Filter out upgrades that are already at max level
-        let availableUpgrades = allUpgrades.filter(u => this.upgrades[u.key] < u.max);
-        
-        // Side cannon requires rear cannon to be unlocked first
-        availableUpgrades = availableUpgrades.filter(u => {
-            if (u.key === 'sidecannon') {
-                return this.upgrades.rear > 0;
-            }
-            return true;
-        });
+        // Filter out maxed upgrades and those with unmet requirements
+        let availableUpgrades = UPGRADE_DEFS.filter(u =>
+            this.upgrades[u.key] < u.max && (!u.requires || this.upgrades[u.requires] > 0)
+        );
         
         // In hard mode, only show upgrades we haven't picked yet (new upgrades take a slot)
         // If slots are full, only show level-ups to existing upgrades
@@ -3301,37 +1714,7 @@ class GameScene extends Phaser.Scene {
             bullet.setVisible(false);
         }
         
-        // Explosive rounds (from bullet property)
-        if (bullet.explosive) {
-            const radius = bullet.explosiveRadius || 70;
-            const explosionDamage = bullet.explosiveDamage || 3;
-            this.createExplosion(enemy.x, enemy.y, 15 + (bullet.explosiveDamage || 3) * 2, radius, true);
-            
-            // Visual ring for explosive impact
-            const ring = this.add.circle(enemy.x, enemy.y, radius, 0xff4400, 0.3);
-            this.tweens.add({
-                targets: ring,
-                alpha: 0,
-                scale: 1.5,
-                duration: 200,
-                onComplete: () => ring.destroy()
-            });
-            
-            // Damage nearby enemies
-            this.enemies.children.iterate((otherEnemy) => {
-                if (otherEnemy && otherEnemy.active && otherEnemy !== enemy) {
-                    const dx = otherEnemy.x - enemy.x;
-                    const dy = otherEnemy.y - enemy.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < radius) {
-                        otherEnemy.health -= explosionDamage;
-                        if (otherEnemy.health <= 0) {
-                            this.destroyEnemy(otherEnemy, false, null);
-                        }
-                    }
-                }
-            });
-        }
+        this.handleExplosiveRound(bullet, enemy.x, enemy.y, enemy);
         
         if (enemy.health <= 0) {
             this.destroyEnemy(enemy, null, bullet);
@@ -3452,22 +1835,7 @@ class GameScene extends Phaser.Scene {
             bullet.setVisible(false);
         }
         
-        // Explosive rounds
-        if (bullet.explosive) {
-            const radius = bullet.explosiveRadius || 70;
-            const explosionDamage = bullet.explosiveDamage || 3;
-            this.createExplosion(asteroid.x, asteroid.y, 15 + explosionDamage * 2, radius, true);
-            
-            // Visual ring for explosive impact
-            const ring = this.add.circle(asteroid.x, asteroid.y, radius, 0xff4400, 0.3);
-            this.tweens.add({
-                targets: ring,
-                alpha: 0,
-                scale: 1.5,
-                duration: 200,
-                onComplete: () => ring.destroy()
-            });
-        }
+        this.handleExplosiveRound(bullet, asteroid.x, asteroid.y);
         
         if (asteroid.health <= 0) {
             this.destroyAsteroid(asteroid, false, bullet);
@@ -3496,6 +1864,17 @@ class GameScene extends Phaser.Scene {
         asteroid.destroy();
     }
 
+    destroyBoss(boss) {
+        this.createExplosion(boss.x, boss.y, 20);
+        if (boss.gemType) {
+            this.spawnGem(boss.x, boss.y, boss.gemType);
+        }
+        if (boss.healthBarBg) boss.healthBarBg.destroy();
+        if (boss.healthBar) boss.healthBar.destroy();
+        this.score += boss.scoreValue;
+        boss.destroy();
+    }
+
     bulletHitBoss(bullet, boss) {
         if (!bullet.active || !boss.active) return;
         
@@ -3509,160 +1888,41 @@ class GameScene extends Phaser.Scene {
             this.chainLightning(boss.x, boss.y, jumps, range, new Set());
         }
         
-        // Explosive rounds
-        if (bullet.explosive) {
-            const radius = bullet.explosiveRadius || 70;
-            const explosionDamage = bullet.explosiveDamage || 3;
-            this.createExplosion(boss.x, boss.y, 15 + explosionDamage * 2, radius, true);
-            
-            // Visual ring for explosive impact
-            const ring = this.add.circle(boss.x, boss.y, radius, 0xff4400, 0.3);
-            this.tweens.add({
-                targets: ring,
-                alpha: 0,
-                scale: 1.5,
-                duration: 200,
-                onComplete: () => ring.destroy()
-            });
-            
-            // Damage nearby enemies
-            this.enemies.children.iterate((enemy) => {
-                if (enemy && enemy.active) {
-                    const dx = enemy.x - boss.x;
-                    const dy = enemy.y - boss.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < radius) {
-                        enemy.health -= explosionDamage;
-                        if (enemy.health <= 0) {
-                            this.destroyEnemy(enemy);
-                        }
-                    }
-                }
-            });
-        }
+        this.handleExplosiveRound(bullet, boss.x, boss.y);
         
         // Piercing doesn't work on boss
         bullet.setActive(false);
         bullet.setVisible(false);
         
         if (boss.health <= 0) {
-            this.createExplosion(boss.x, boss.y, 20);
-            
-            // Spawn gem
-            if (boss.gemType) {
-                this.spawnGem(boss.x, boss.y, boss.gemType);
-            }
-            
-            if (boss.healthBarBg) boss.healthBarBg.destroy();
-            if (boss.healthBar) boss.healthBar.destroy();
-            this.score += boss.scoreValue;
-            boss.destroy();
+            this.destroyBoss(boss);
         }
     }
 
-    playerHitEnemy(player, enemy) {
+    handlePlayerCollision(collider, damage, destroyCollider = true, shieldExplosion = true) {
         if (this.godMode) {
-            enemy.destroy();
+            if (destroyCollider) collider.destroy();
             return;
         }
-        
         if (this.shieldActive) {
             this.shieldActive = false;
             if (this.shieldCircle) {
                 this.shieldCircle.destroy();
                 this.shieldCircle = null;
             }
-            this.createExplosion(player.x, player.y);
-            enemy.destroy();
+            if (shieldExplosion) this.createExplosion(this.player.x, this.player.y);
+            if (destroyCollider) collider.destroy();
             return;
         }
-        
-        // Skip if invincible
-        if (this.isInvincible) {
-            return;
-        }
-        
-        // Take damage - 20 HP per enemy hit
-        this.takeDamage(20);
-        enemy.destroy();
-    }
-    
-    playerHitAsteroid(player, asteroid) {
-        if (this.godMode) {
-            asteroid.destroy();
-            return;
-        }
-        
-        if (this.shieldActive) {
-            this.shieldActive = false;
-            if (this.shieldCircle) {
-                this.shieldCircle.destroy();
-                this.shieldCircle = null;
-            }
-            this.createExplosion(player.x, player.y);
-            asteroid.destroy();
-            return;
-        }
-        
-        // Skip if invincible
-        if (this.isInvincible) {
-            return;
-        }
-        
-        // Take damage - 15 HP per asteroid hit
-        this.takeDamage(15);
-        asteroid.destroy();
+        if (this.isInvincible) return;
+        this.takeDamage(damage);
+        if (destroyCollider) collider.destroy();
     }
 
-    playerHitBoss(player, boss) {
-        if (this.godMode) {
-            return;
-        }
-        
-        if (this.shieldActive) {
-            this.shieldActive = false;
-            if (this.shieldCircle) {
-                this.shieldCircle.destroy();
-                this.shieldCircle = null;
-            }
-            this.createExplosion(player.x, player.y);
-            return;
-        }
-        
-        // Skip if invincible
-        if (this.isInvincible) {
-            return;
-        }
-        
-        // Take damage - 30 HP per boss contact
-        this.takeDamage(30);
-    }
-
-    playerHitBullet(player, bullet) {
-        if (this.godMode) {
-            bullet.destroy();
-            return;
-        }
-        
-        if (this.shieldActive) {
-            this.shieldActive = false;
-            if (this.shieldCircle) {
-                this.shieldCircle.destroy();
-                this.shieldCircle = null;
-            }
-            bullet.destroy();
-            return;
-        }
-        
-        // Skip if invincible
-        if (this.isInvincible) {
-            return;
-        }
-        
-        // Take damage - 10 HP per bullet hit
-        this.takeDamage(10);
-        bullet.destroy();
-    }
+    playerHitEnemy(player, enemy) { this.handlePlayerCollision(enemy, 20); }
+    playerHitAsteroid(player, asteroid) { this.handlePlayerCollision(asteroid, 15); }
+    playerHitBoss(player, boss) { this.handlePlayerCollision(boss, 30, false); }
+    playerHitBullet(player, bullet) { this.handlePlayerCollision(bullet, 10, true, false); }
 
     takeDamage(amount) {
         this.health -= amount;
@@ -4076,14 +2336,7 @@ class GameScene extends Phaser.Scene {
                     this.createLaserHitVFX(boss.x, boss.y);
 
                     if (boss.health <= 0) {
-                        this.createExplosion(boss.x, boss.y, 20);
-                        if (boss.gemType) {
-                            this.spawnGem(boss.x, boss.y, boss.gemType);
-                        }
-                        if (boss.healthBarBg) boss.healthBarBg.destroy();
-                        if (boss.healthBar) boss.healthBar.destroy();
-                        this.score += boss.scoreValue;
-                        boss.destroy();
+                        this.destroyBoss(boss);
                     }
                 }
             }
@@ -4311,10 +2564,8 @@ class GameScene extends Phaser.Scene {
         for (const key of this.acquiredUpgrades) {
             const value = this.upgrades[key];
             if (value > 0) {
-                let displayKey = key.charAt(0).toUpperCase() + key.slice(1);
-                // Special case for rear and sidecannon
-                if (key === 'rear') displayKey = 'Rear Turret';
-                if (key === 'sidecannon') displayKey = 'Side Turret';
+                const def = UPGRADE_DEFS.find(d => d.key === key);
+                const displayKey = def ? def.displayName : key.charAt(0).toUpperCase() + key.slice(1);
                 if (!this.upgradeTexts[key]) {
                     // Create new text for this upgrade
                     this.upgradeTexts[key] = this.add.text(this.gameWidth - 20, yPos, `${displayKey}: ${value}`, {
@@ -4392,23 +2643,3 @@ class GameScene extends Phaser.Scene {
         });
     }
 }
-
-// Game configuration
-const config = {
-    type: Phaser.AUTO,
-    width: 1000,
-    height: 700,
-    parent: 'game-container',
-    backgroundColor: '#000000',
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    },
-    scene: [BootScene, IntroScene, GameScene]
-};
-
-// Create the game
-const game = new Phaser.Game(config);
