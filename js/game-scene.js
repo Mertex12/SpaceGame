@@ -28,8 +28,8 @@ class GameScene extends Phaser.Scene {
         // Powerup timers
         this.rapidFireActive = false;
         this.multiShotActive = false;
-        this.shieldStacks = 0;
-        this.maxShieldStacks = 0;
+        this.shieldStacks = 1;
+        this.maxShieldStacks = 1;
         this.shieldActive = false;
         this.isInvincible = false;
         this.rapidFireTimer = null;
@@ -112,6 +112,9 @@ class GameScene extends Phaser.Scene {
         
         // Vampiric cooldown
         this.lastVampiricHealTime = 0;
+
+        // Shield hit invincibility
+        this.lastShieldHitTime = 0;
 
         // Shield regen
         this.lastShieldRegenTime = 0;
@@ -439,7 +442,7 @@ class GameScene extends Phaser.Scene {
         this.shieldIcon = this.add.image(this.gameWidth - 40, this.gameHeight - 40, 'upgradeShield');
         this.shieldIcon.setScale(1.5);
         this.shieldIcon.setVisible(false);
-        this.shieldStackText = this.add.text(this.gameWidth - 40, this.gameHeight - 40, '', {
+        this.shieldStackText = this.add.text(this.gameWidth - 40, this.gameHeight - 20, '', {
             fontSize: '16px',
             fill: '#00ffff',
             fontFamily: 'Arial',
@@ -851,12 +854,12 @@ class GameScene extends Phaser.Scene {
             this.shieldIcon.setVisible(true);
             this.shieldStackText.setVisible(true);
             this.shieldStackText.setText(`${this.shieldStacks}/${this.maxShieldStacks}`);
-            this.shieldIcon.setAlpha(this.shieldStacks > 0 ? 1 : 0.3);
+            this.shieldIcon.setAlpha(0.3);
             // Position: shift left if nuke is visible
             const hasNuke = this.upgrades.nuke > 0;
             const shieldX = hasNuke ? this.gameWidth - 100 : this.gameWidth - 40;
             this.shieldIcon.setPosition(shieldX, this.gameHeight - 40);
-            this.shieldStackText.setPosition(shieldX, this.gameHeight - 40);
+            this.shieldStackText.setPosition(shieldX, this.gameHeight - 20);
         }
 
         // Check game over
@@ -1680,8 +1683,8 @@ class GameScene extends Phaser.Scene {
             this.maxHealth -= 10;
             this.health = Math.min(this.health, this.maxHealth);
         } else if (card.upgradeKey === 'shield') {
-            this.maxShieldStacks = this.upgrades.shield;
-            this.shieldStacks = this.maxShieldStacks;
+            this.maxShieldStacks = 1 + this.upgrades.shield;
+            this.shieldStacks = Math.min(this.shieldStacks + 1, this.maxShieldStacks);
             this.shieldActive = true;
             this.lastShieldRegenTime = this.getGameTime();
             this.activateShieldVisual();
@@ -1815,7 +1818,14 @@ class GameScene extends Phaser.Scene {
 
     bulletHitEnemy(bullet, enemy) {
         if (!bullet.active || !enemy.active) return;
-        
+
+        // Prevent piercing bullets from hitting the same enemy twice
+        if (bullet.pierceCount > 0) {
+            if (!bullet.hitEnemies) bullet.hitEnemies = new Set();
+            if (bullet.hitEnemies.has(enemy)) return;
+            bullet.hitEnemies.add(enemy);
+        }
+
         // Deal damage
         const damage = bullet.damage || 1;
         enemy.health -= damage;
@@ -1824,7 +1834,7 @@ class GameScene extends Phaser.Scene {
         if (bullet.chainLightning) {
             const jumps = bullet.lightningJumps || 1;
             const range = bullet.lightningRange || 200;
-            this.chainLightning(enemy.x, enemy.y, jumps, range, new Set());
+            this.chainLightning(enemy.x, enemy.y, jumps, range, new Set([enemy]));
         }
         
         // Piercing
@@ -1844,6 +1854,7 @@ class GameScene extends Phaser.Scene {
     
     destroyEnemy(enemy, fromLightning = false, killingBullet = null) {
         if (!enemy.active) return; // Prevent double-destroy (double gems)
+        enemy.active = false; // Deactivate immediately to block any further calls
         this.createExplosion(enemy.x, enemy.y, 5);
         
         // Spawn gem
@@ -1860,7 +1871,7 @@ class GameScene extends Phaser.Scene {
         // Vampiric healing - heal per kill (1s cooldown)
         if (this.upgrades.vampiric > 0) {
             const gameTime = this.getGameTime();
-            if (gameTime - this.lastVampiricHealTime >= 1000) {
+            if (gameTime - this.lastVampiricHealTime >= 750) {
                 const healAmount = this.upgrades.vampiric; // 1, 2, or 3 HP
                 this.health = Math.min(this.maxHealth, this.health + healAmount);
                 this.lastVampiricHealTime = gameTime;
@@ -1942,7 +1953,14 @@ class GameScene extends Phaser.Scene {
 
     bulletHitAsteroid(bullet, asteroid) {
         if (!bullet.active || !asteroid.active) return;
-        
+
+        // Prevent piercing bullets from hitting the same asteroid twice
+        if (bullet.pierceCount > 0) {
+            if (!bullet.hitEnemies) bullet.hitEnemies = new Set();
+            if (bullet.hitEnemies.has(asteroid)) return;
+            bullet.hitEnemies.add(asteroid);
+        }
+
         const damage = bullet.damage || 1;
         asteroid.health -= damage;
         
@@ -1950,7 +1968,7 @@ class GameScene extends Phaser.Scene {
         if (bullet.chainLightning) {
             const jumps = bullet.lightningJumps || 1;
             const range = bullet.lightningRange || 200;
-            this.chainLightning(asteroid.x, asteroid.y, jumps, range, new Set());
+            this.chainLightning(asteroid.x, asteroid.y, jumps, range, new Set([asteroid]));
         }
         
         // Piercing
@@ -1969,6 +1987,8 @@ class GameScene extends Phaser.Scene {
     }
     
     destroyAsteroid(asteroid, fromLightning = false, killingBullet = null) {
+        if (!asteroid.active) return;
+        asteroid.active = false;
         this.createExplosion(asteroid.x, asteroid.y, 6);
         
         // Spawn gem
@@ -2034,6 +2054,12 @@ class GameScene extends Phaser.Scene {
             return;
         }
         if (this.shieldStacks > 0 || this.shieldActive) {
+            const gameTime = this.getGameTime();
+            if (gameTime - this.lastShieldHitTime < 500) {
+                if (destroyCollider) collider.destroy();
+                return;
+            }
+            this.lastShieldHitTime = gameTime;
             this.shieldStacks = Math.max(0, this.shieldStacks - 1);
             if (this.shieldStacks <= 0) {
                 this.shieldActive = false;
