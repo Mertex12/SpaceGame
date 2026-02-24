@@ -28,6 +28,8 @@ class GameScene extends Phaser.Scene {
         // Powerup timers
         this.rapidFireActive = false;
         this.multiShotActive = false;
+        this.shieldStacks = 0;
+        this.maxShieldStacks = 0;
         this.shieldActive = false;
         this.isInvincible = false;
         this.rapidFireTimer = null;
@@ -108,6 +110,18 @@ class GameScene extends Phaser.Scene {
         this.nukeCooldown = 0;
         this.nukeMaxCooldown = 60000; // 60 seconds
         
+        // Vampiric cooldown
+        this.lastVampiricHealTime = 0;
+
+        // Shield regen
+        this.lastShieldRegenTime = 0;
+
+        // Flood mode (post-boss-3)
+        this.floodMode = false;
+        this.floodModeStartTime = 0;
+        this.floodHealthMultiplier = 1;
+        this.lastFloodHealthDouble = 0;
+
         // Rear turret timer
         this.lastRearShot = 0;
         
@@ -421,6 +435,18 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.nukeCooldownText.setVisible(false);
         
+        // Shield stacks indicator (bottom right, shifts left if nuke exists)
+        this.shieldIcon = this.add.image(this.gameWidth - 40, this.gameHeight - 40, 'upgradeShield');
+        this.shieldIcon.setScale(1.5);
+        this.shieldIcon.setVisible(false);
+        this.shieldStackText = this.add.text(this.gameWidth - 40, this.gameHeight - 40, '', {
+            fontSize: '16px',
+            fill: '#00ffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.shieldStackText.setVisible(false);
+
         // Mode indicator (only show slots in hard mode, on the right side)
         if (this.gameMode === 'hard') {
             // Upgrade slots indicator - right side, above upgrade list
@@ -431,6 +457,15 @@ class GameScene extends Phaser.Scene {
                 fontStyle: 'bold'
             }).setOrigin(1, 0);
         }
+
+        // Set all UI elements above game objects
+        const uiDepth = 100;
+        [this.scoreText, this.healthText, this.levelText, this.xpBarBg, this.xpBar, this.xpText,
+         this.timerText, this.rapidText, this.multiText, this.lasersText,
+         this.nukeIcon, this.nukeCooldownText, this.shieldIcon, this.shieldStackText,
+         this.slotsText].forEach(el => {
+            if (el) el.setDepth(uiDepth);
+        });
     }
 
     createUpgradeUI() {
@@ -589,6 +624,9 @@ class GameScene extends Phaser.Scene {
         // Update enemy scaling
         this.updateEnemyScaling(time);
 
+        // Shield regen
+        this.updateShieldRegen();
+
         // Update starfield
         this.stars.children.iterate((star) => {
             star.y += star.speed;
@@ -599,8 +637,8 @@ class GameScene extends Phaser.Scene {
         });
 
         // Player movement
-        const baseSpeed = 300;
-        const speed = baseSpeed * (1 - (this.upgrades.giant * 0.15));
+        const giantSpeeds = [300, 275, 245, 215, 185, 155];
+        const speed = giantSpeeds[this.upgrades.giant] || 155;
         this.player.setVelocity(0);
 
         if (this.cursors.left.isDown || this.wasd.left.isDown) {
@@ -808,6 +846,19 @@ class GameScene extends Phaser.Scene {
             }
         }
 
+        // Update shield stacks indicator
+        if (this.maxShieldStacks > 0) {
+            this.shieldIcon.setVisible(true);
+            this.shieldStackText.setVisible(true);
+            this.shieldStackText.setText(`${this.shieldStacks}/${this.maxShieldStacks}`);
+            this.shieldIcon.setAlpha(this.shieldStacks > 0 ? 1 : 0.3);
+            // Position: shift left if nuke is visible
+            const hasNuke = this.upgrades.nuke > 0;
+            const shieldX = hasNuke ? this.gameWidth - 100 : this.gameWidth - 40;
+            this.shieldIcon.setPosition(shieldX, this.gameHeight - 40);
+            this.shieldStackText.setPosition(shieldX, this.gameHeight - 40);
+        }
+
         // Check game over
         if (this.health <= 0) {
             this.gameOver();
@@ -824,7 +875,7 @@ class GameScene extends Phaser.Scene {
         }
 
         const auraRadius = 40 + (this.upgrades.garlic * 25);
-        const damagePerTick = 1 + this.upgrades.garlic;
+        const damagePerTick = (1 + this.upgrades.garlic) * this.getGiantMultiplier();
 
         if (!this.garlicAura) {
             this.garlicAura = this.add.circle(this.player.x, this.player.y, auraRadius, 0x9966ff, 0.2);
@@ -853,11 +904,51 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    updateShieldRegen() {
+        if (this.upgrades.shield <= 0 || this.shieldStacks >= this.maxShieldStacks) return;
+        const gameTime = this.getGameTime();
+        // Regen intervals: level 1=10s, 2=5s, 3=4s, 4=3s, 5=2s
+        const regenIntervals = [0, 10000, 5000, 4000, 3000, 2000];
+        const interval = regenIntervals[this.upgrades.shield] || 2000;
+        if (gameTime - this.lastShieldRegenTime >= interval) {
+            this.shieldStacks++;
+            this.shieldActive = true;
+            this.lastShieldRegenTime = gameTime;
+            this.activateShieldVisual();
+        }
+    }
+
+    activateShieldVisual() {
+        if (!this.shieldCircle) {
+            this.shieldCircle = this.add.circle(0, 0, 22);
+            this.shieldCircle.setFillStyle(0x000000, 0);
+        }
+        this.updateShieldVisual();
+        this.shieldCircle.setPosition(this.player.x, this.player.y);
+    }
+
+    updateShieldVisual() {
+        if (!this.shieldCircle) return;
+        // Thicker stroke and brighter color with more stacks
+        const thickness = 2 + this.shieldStacks;
+        const alpha = Math.min(0.4 + this.shieldStacks * 0.15, 1);
+        this.shieldCircle.setStrokeStyle(thickness, 0x0088ff, alpha);
+    }
+
     updateEnemyScaling(time) {
         const elapsed = time - this.gameStartTime - (this.pauseTimeOffset || 0);
-        
-        // Spawn rate increases every mode-specific interval
-        if (elapsed - this.lastSpawnIncreaseTime >= this.spawnIncreaseInterval) {
+
+        // Flood mode: double enemy health every 15 seconds
+        if (this.floodMode) {
+            const gameTime = this.getGameTime();
+            if (gameTime - this.lastFloodHealthDouble >= 12000) {
+                this.floodHealthMultiplier *= 2;
+                this.lastFloodHealthDouble = gameTime;
+            }
+        }
+
+        // Spawn rate increases every mode-specific interval (skipped in flood mode)
+        if (!this.floodMode && elapsed - this.lastSpawnIncreaseTime >= this.spawnIncreaseInterval) {
             this.enemySpawnRate = Math.max(this.spawnRateCap, this.enemySpawnRate - 200);
             this.lastSpawnIncreaseTime = elapsed;
             
@@ -886,6 +977,10 @@ class GameScene extends Phaser.Scene {
         }
     }
     
+    getGiantMultiplier() {
+        return 1 + (this.upgrades.giant * 0.25);
+    }
+
     getDamageMultiplier() {
         let mult = 1 + (this.upgrades.giant * 0.25);
         if (this.upgrades.berserker > 0) {
@@ -903,7 +998,7 @@ class GameScene extends Phaser.Scene {
     handleExplosiveRound(bullet, x, y, excludeTarget = null) {
         if (!bullet.explosive) return;
         const radius = bullet.explosiveRadius || 70;
-        const explosionDamage = bullet.explosiveDamage || 3;
+        const explosionDamage = (bullet.explosiveDamage || 3) * this.getGiantMultiplier();
         this.createExplosion(x, y, 15 + explosionDamage * 2, radius, true);
 
         const ring = this.add.circle(x, y, radius, 0xff4400, 0.3);
@@ -1169,7 +1264,7 @@ class GameScene extends Phaser.Scene {
         
         this.boss.children.iterate((boss) => {
             if (boss && boss.active) {
-                boss.health -= 25;
+                boss.health -= 25 * this.getGiantMultiplier();
                 if (boss.health <= 0) {
                     this.destroyBoss(boss);
                 }
@@ -1216,6 +1311,27 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    createFloodModeText() {
+        this.floodText = this.add.text(this.gameWidth / 2, this.gameHeight / 2 - 80, 'BONUS WAVES!!!', {
+            fontSize: '48px',
+            fill: '#ff4444',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#ffffff',
+            strokeThickness: 4
+        }).setOrigin(0.5).setAlpha(0).setDepth(1000);
+
+        this.tweens.add({
+            targets: this.floodText,
+            alpha: { from: 0, to: 1 },
+            scale: { from: 0.8, to: 1.1 },
+            duration: 600,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
     spawnEnemy() {
         const x = Phaser.Math.Between(20, this.gameWidth - 20);
         const typeName = getSpawnType(this.score);
@@ -1224,6 +1340,7 @@ class GameScene extends Phaser.Scene {
         const spawnY = def.elite ? -40 : -20;
         const enemy = this.enemies.create(x, spawnY, def.texture);
         enemy.health = this.gameMode === 'hard' ? def.hardHealth : def.health;
+        if (this.floodMode) enemy.health *= this.floodHealthMultiplier;
         enemy.maxHealth = enemy.health;
         enemy.scoreValue = def.score;
         enemy.gemType = def.gem;
@@ -1310,8 +1427,8 @@ class GameScene extends Phaser.Scene {
     }
 
     spawnPowerup(x, y) {
-        // 20% chance for temp powerup (from enemies)
-        if (Phaser.Math.Between(0, 4) === 0) {
+        // 15% chance for temp powerup (from enemies)
+        if (Phaser.Math.Between(1, 100) <= 15) {
             const types = ['powerupShield', 'powerupRapid', 'powerupMulti', 'powerupLasers'];
             const type = types[Phaser.Math.Between(0, 3)];
             const powerup = this.powerups.create(x, y, type);
@@ -1559,15 +1676,15 @@ class GameScene extends Phaser.Scene {
         if (card.upgradeKey === 'giant') {
             const scale = 1 + (this.upgrades.giant * 0.25);
             this.player.setScale(scale);
+        } else if (card.upgradeKey === 'vampiric') {
+            this.maxHealth -= 10;
+            this.health = Math.min(this.health, this.maxHealth);
         } else if (card.upgradeKey === 'shield') {
+            this.maxShieldStacks = this.upgrades.shield;
+            this.shieldStacks = this.maxShieldStacks;
             this.shieldActive = true;
-            // Create shield visual
-            if (!this.shieldCircle) {
-                this.shieldCircle = this.add.circle(0, 0, 22);
-                this.shieldCircle.setFillStyle(0x000000, 0);
-                this.shieldCircle.setStrokeStyle(3, 0x0088ff, 0.8);
-            }
-            this.shieldCircle.setPosition(this.player.x, this.player.y);
+            this.lastShieldRegenTime = this.getGameTime();
+            this.activateShieldVisual();
         }
         
         // Hide cards
@@ -1726,6 +1843,7 @@ class GameScene extends Phaser.Scene {
     }
     
     destroyEnemy(enemy, fromLightning = false, killingBullet = null) {
+        if (!enemy.active) return; // Prevent double-destroy (double gems)
         this.createExplosion(enemy.x, enemy.y, 5);
         
         // Spawn gem
@@ -1739,10 +1857,14 @@ class GameScene extends Phaser.Scene {
         // Score
         this.score += enemy.scoreValue;
         
-        // Vampiric healing - heal per kill
+        // Vampiric healing - heal per kill (1s cooldown)
         if (this.upgrades.vampiric > 0) {
-            const healAmount = this.upgrades.vampiric; // 1, 2, or 3 HP
-            this.health = Math.min(this.maxHealth, this.health + healAmount);
+            const gameTime = this.getGameTime();
+            if (gameTime - this.lastVampiricHealTime >= 1000) {
+                const healAmount = this.upgrades.vampiric; // 1, 2, or 3 HP
+                this.health = Math.min(this.maxHealth, this.health + healAmount);
+                this.lastVampiricHealTime = gameTime;
+            }
         }
         
         enemy.destroy();
@@ -1802,7 +1924,7 @@ class GameScene extends Phaser.Scene {
             });
             
             // Damage target
-            nearest.health -= 1;
+            nearest.health -= 1 * this.getGiantMultiplier();
             if (nearest.health <= 0) {
                 if (targetType === 'enemy') {
                     this.destroyEnemy(nearest, true); // true = from lightning
@@ -1859,12 +1981,6 @@ class GameScene extends Phaser.Scene {
         // 5% chance for health pickup
         this.spawnHealthPickup(asteroid.x, asteroid.y);
         
-        // Vampiric healing - works on asteroids too
-        if (this.upgrades.vampiric > 0) {
-            const healAmount = this.upgrades.vampiric; // 1, 2, or 3 HP
-            this.health = Math.min(this.maxHealth, this.health + healAmount);
-        }
-        
         asteroid.destroy();
     }
 
@@ -1877,6 +1993,15 @@ class GameScene extends Phaser.Scene {
         if (boss.healthBar) boss.healthBar.destroy();
         this.score += boss.scoreValue;
         boss.destroy();
+
+        // Activate flood mode after 3rd boss is defeated
+        if (this.bossCount >= 3 && !this.floodMode) {
+            this.floodMode = true;
+            this.floodModeStartTime = this.getGameTime();
+            this.lastFloodHealthDouble = this.floodModeStartTime;
+            this.enemySpawnRate = 10;
+            this.createFloodModeText();
+        }
     }
 
     bulletHitBoss(bullet, boss) {
@@ -1908,11 +2033,16 @@ class GameScene extends Phaser.Scene {
             if (destroyCollider) collider.destroy();
             return;
         }
-        if (this.shieldActive) {
-            this.shieldActive = false;
-            if (this.shieldCircle) {
-                this.shieldCircle.destroy();
-                this.shieldCircle = null;
+        if (this.shieldStacks > 0 || this.shieldActive) {
+            this.shieldStacks = Math.max(0, this.shieldStacks - 1);
+            if (this.shieldStacks <= 0) {
+                this.shieldActive = false;
+                if (this.shieldCircle) {
+                    this.shieldCircle.destroy();
+                    this.shieldCircle = null;
+                }
+            } else {
+                this.updateShieldVisual();
             }
             if (shieldExplosion) this.createExplosion(this.player.x, this.player.y);
             if (destroyCollider) collider.destroy();
@@ -1962,15 +2092,9 @@ class GameScene extends Phaser.Scene {
 
         switch (type) {
             case 'powerupShield':
+                this.shieldStacks = Math.min(this.shieldStacks + 1, Math.max(1, this.maxShieldStacks));
                 this.shieldActive = true;
-                // Create shield visual
-                if (!this.shieldCircle) {
-                    this.shieldCircle = this.add.circle(0, 0, 22);
-                    this.shieldCircle.setFillStyle(0x000000, 0);
-                    this.shieldCircle.setStrokeStyle(3, 0x0088ff, 0.8);
-                }
-                this.shieldCircle.x = this.player.x;
-                this.shieldCircle.y = this.player.y;
+                this.activateShieldVisual();
                 break;
             case 'powerupRapid':
                 this.rapidFireActive = true;
@@ -2031,7 +2155,7 @@ class GameScene extends Phaser.Scene {
     fireLasers() {
         const speed = 450; // pixels per second
         const laserLength = 120; // length of the laser beam itself
-        const damage = 3;
+        const damage = 3 * this.getGiantMultiplier();
 
         // Create two lasers - one up-left, one up-right (45 degree angles)
         const angles = [-Math.PI / 4, -3 * Math.PI / 4]; // -45° and -135°
@@ -2268,7 +2392,7 @@ class GameScene extends Phaser.Scene {
 
         // Draw gradient line through all visible points
         // Outer glow (darker green) - 12px
-        graphics.lineStyle(12, 0x00aa00, 0.6);
+        graphics.lineStyle(12, 0x006600, 0.4);
         graphics.beginPath();
         graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
         for (let i = 1; i < visiblePoints.length; i++) {
@@ -2277,7 +2401,7 @@ class GameScene extends Phaser.Scene {
         graphics.strokePath();
 
         // Middle layer - 8px
-        graphics.lineStyle(8, 0x00dd00, 0.8);
+        graphics.lineStyle(8, 0x009900, 0.6);
         graphics.beginPath();
         graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
         for (let i = 1; i < visiblePoints.length; i++) {
@@ -2286,7 +2410,7 @@ class GameScene extends Phaser.Scene {
         graphics.strokePath();
 
         // Core (bright green) - 4px
-        graphics.lineStyle(4, 0xccffcc, 1);
+        graphics.lineStyle(4, 0x88cc88, 0.8);
         graphics.beginPath();
         graphics.moveTo(visiblePoints[0].x, visiblePoints[0].y);
         for (let i = 1; i < visiblePoints.length; i++) {
@@ -2424,6 +2548,7 @@ class GameScene extends Phaser.Scene {
     resetPlayer() {
         this.player.setPosition(this.gameWidth / 2, this.gameHeight - 100);
         this.player.setVelocity(0);
+        this.shieldStacks = 0;
         this.shieldActive = false;
         this.rapidFireActive = false;
         this.multiShotActive = false;
@@ -2583,7 +2708,7 @@ class GameScene extends Phaser.Scene {
                         fill: '#aaaaaa',
                         fontFamily: 'Arial',
                         fontStyle: 'bold'
-                    }).setOrigin(1, 0);
+                    }).setOrigin(1, 0).setDepth(100);
                 } else {
                     // Update existing text and position
                     this.upgradeTexts[key].setText(`${displayKey}: ${value}`);
@@ -2613,6 +2738,12 @@ class GameScene extends Phaser.Scene {
             this.berserkerAura = null;
         }
         
+        // Cleanup flood mode text
+        if (this.floodText) {
+            this.floodText.destroy();
+            this.floodText = null;
+        }
+
         // Cleanup shield circle
         if (this.shieldCircle) {
             this.shieldCircle.destroy();

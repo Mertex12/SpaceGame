@@ -29,7 +29,7 @@ const TEXTURE_DEFS = {
 
     // Projectiles
     bullet:      { w: 12, h: 16, steps: [['fill',0x00ffff],['rect',3,0,6,16],['fill',0xffffff],['rect',5,2,2,12]] },
-    enemyBullet: { w: 12, h: 12, steps: [['fill',0xff0000],['rect',3,0,6,12],['fill',0xff6600],['rect',5,2,2,8]] },
+    enemyBullet: { w: 14, h: 16, steps: [['stroke',2,0xffffff],['strokePoly',[3,2,11,2,11,14,3,14]],['fill',0xff0000],['rect',4,2,6,12],['fill',0xff6600],['rect',6,4,2,8]] },
 
     // Powerups
     powerupShield: { w: 32, h: 32, steps: [['fill',0x0088ff],['circle',16,16,14],['fill',0x004488],['circle',16,16,10],['fill',0x00ffff],['fillPoly',[16,6,26,16,16,26,6,16]]] },
@@ -75,8 +75,8 @@ const UPGRADE_DEFS = [
     { key: 'rear',       name: 'Rear Turret',       displayName: 'Rear Turret',  desc: 'Auto-fires behind you',           max: 5 },
     { key: 'explosive',  name: 'Explosive Rounds',  displayName: 'Explosive',    desc: 'Bullets explode on impact',       max: 5 },
     { key: 'lightning',  name: 'Chain Lightning',    displayName: 'Lightning',    desc: 'Lightning arcs to nearby enemies', max: 5 },
-    { key: 'vampiric',   name: 'Vampiric',          displayName: 'Vampiric',     desc: 'Heal on kills',                   max: 3 },
-    { key: 'shield',     name: 'Shield Battery',     displayName: 'Shield',       desc: '+1 Max Shield',                   max: 99 },
+    { key: 'vampiric',   name: 'Vampiric',          displayName: 'Vampiric',     desc: 'Heal on kills, -10 max HP',       max: 3 },
+    { key: 'shield',     name: 'Shield Battery',     displayName: 'Shield',       desc: '+1 Shield stack & regen',         max: 5 },
     { key: 'magnet',     name: 'Magnetic Field',     displayName: 'Magnet',       desc: 'Increased pickup range',          max: 99 },
     { key: 'garlic',     name: 'Garlic',             displayName: 'Garlic',       desc: 'Damages enemies in aura',         max: 5 },
     { key: 'nuke',       name: 'Screen Nuke',        displayName: 'Nuke',         desc: 'Press Z to clear screen',         max: 5 },
