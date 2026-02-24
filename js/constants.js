@@ -42,10 +42,14 @@ const TEXTURE_DEFS = {
     star:     { w: 4, h: 4, steps: [['fill',0xffffff],['circle',2,2,2]] },
     particle: { w: 8, h: 8, steps: [['fill',0xffff00],['circle',4,4,4],['fill',0xff6600],['circle',4,4,2]] },
 
-    // Gems
-    gemSmall:  { w: 18, h: 18, steps: [['stroke',2,0xffffff],['strokeCircle',9,9,7],['fill',0x00aaff],['circle',9,9,6],['fill',0x88ccff],['circle',8,8,3]] },
-    gemMedium: { w: 26, h: 26, steps: [['stroke',2,0xffffff],['strokeCircle',13,13,10],['fill',0x00ff00],['circle',13,13,9],['fill',0x88ff88],['circle',11,11,4]] },
-    gemLarge:  { w: 34, h: 34, steps: [['stroke',3,0xffffff],['strokeCircle',17,17,13],['fill',0xffd700],['circle',17,17,12],['fill',0xffff00],['circle',14,14,5]] },
+    // Gems (small = 18x18, medium = 26x26, large = 34x34)
+    gemSmall:      { w: 18, h: 18, steps: [['stroke',2,0xffffff],['strokeCircle',9,9,7],['fill',0x00aaff],['circle',9,9,6],['fill',0x88ccff],['circle',8,8,3]] },
+    gemSmallGreen: { w: 18, h: 18, steps: [['stroke',2,0xffffff],['strokeCircle',9,9,7],['fill',0x00ff00],['circle',9,9,6],['fill',0x88ff88],['circle',8,8,3]] },
+    gemSmallGold:  { w: 18, h: 18, steps: [['stroke',2,0xffffff],['strokeCircle',9,9,7],['fill',0xffd700],['circle',9,9,6],['fill',0xffff00],['circle',8,8,3]] },
+    gemMediumBlue: { w: 26, h: 26, steps: [['stroke',2,0xffffff],['strokeCircle',13,13,10],['fill',0x00aaff],['circle',13,13,9],['fill',0x88ccff],['circle',11,11,4]] },
+    gemMedium:     { w: 26, h: 26, steps: [['stroke',2,0xffffff],['strokeCircle',13,13,10],['fill',0x00ff00],['circle',13,13,9],['fill',0x88ff88],['circle',11,11,4]] },
+    gemMediumGold: { w: 26, h: 26, steps: [['stroke',2,0xffffff],['strokeCircle',13,13,10],['fill',0xffd700],['circle',13,13,9],['fill',0xffff00],['circle',11,11,4]] },
+    gemLarge:      { w: 34, h: 34, steps: [['stroke',3,0xffffff],['strokeCircle',17,17,13],['fill',0xffd700],['circle',17,17,12],['fill',0xffff00],['circle',14,14,5]] },
 
     // Upgrade icons
     upgradePiercing:  { w: 32, h: 16, steps: [['fill',0x00ffff],['rect',4,6,24,4],['fill',0xff0000],['circle',24,8,6],['fill',0x00ffff],['rect',24,6,12,4]] },
@@ -82,13 +86,36 @@ const UPGRADE_DEFS = [
     { key: 'sidecannon', name: 'Side Turret',         displayName: 'Side Turret',  desc: 'Auto-fires to the side',          max: 2, requires: 'rear' }
 ];
 
+const WEAPON_DEFS = [
+    {
+        name: 'Default',
+        baseCooldown: 300,
+        rapidFireCooldown: 150,
+        bulletSpeed: 500,
+        maxRangeFraction: null,
+    },
+    {
+        name: 'Shotgun',
+        baseCooldown: 750,
+        rapidFireCooldown: 300,
+        bulletSpeed: 600,
+        maxRange: 250,
+        spread: [
+            { xOffset: 0, vx: -220 },
+            { xOffset: 0, vx: -75 },
+            { xOffset: 0, vx: 75 },
+            { xOffset: 0, vx: 220 },
+        ],
+    },
+];
+
 const ENEMY_TYPES = {
-    lightRed:      { texture: 'enemy',              health: 1,  hardHealth: 1,  score: 10,  gem: 'small',  elite: false, damage: 10, radius: 15 },
-    darkRed:       { texture: 'enemyDarkRed',        health: 5,  hardHealth: 8,  score: 20,  gem: 'small',  elite: false, damage: 10, radius: 15 },
-    pulsingRed:    { texture: 'enemyPulsingRed',     health: 10, hardHealth: 15, score: 30,  gem: 'small',  elite: false, damage: 10, radius: 15, pulsing: true },
-    lightPurple:   { texture: 'eliteEnemy',           health: 5,  hardHealth: 8,  score: 50,  gem: 'medium', elite: true,  damage: 8,  radius: 19 },
-    darkPurple:    { texture: 'enemyDarkPurple',      health: 15, hardHealth: 20, score: 75,  gem: 'medium', elite: true,  radius: 19, burstOverride: 1 },
-    pulsingPurple: { texture: 'enemyPulsingPurple',   health: 25, hardHealth: 30, score: 100, gem: 'medium', elite: true,  damage: 15, radius: 19, burstOverride: 5, pulsing: true }
+    lightRed:      { texture: 'enemy',              health: 1,  hardHealth: 1,  score: 10,  gem: 'gemSmall',      gemXp: 5,  elite: false, damage: 10, radius: 15 },
+    darkRed:       { texture: 'enemyDarkRed',        health: 5,  hardHealth: 8,  score: 20,  gem: 'gemSmallGreen', gemXp: 7,  elite: false, damage: 10, radius: 15 },
+    pulsingRed:    { texture: 'enemyPulsingRed',     health: 10, hardHealth: 15, score: 30,  gem: 'gemSmallGold',  gemXp: 10, elite: false, damage: 10, radius: 15, pulsing: true },
+    lightPurple:   { texture: 'eliteEnemy',           health: 5,  hardHealth: 8,  score: 50,  gem: 'gemMediumBlue', gemXp: 25, elite: true,  damage: 8,  radius: 19 },
+    darkPurple:    { texture: 'enemyDarkPurple',      health: 15, hardHealth: 20, score: 75,  gem: 'gemMedium',     gemXp: 30, elite: true,  radius: 19, burstOverride: 3 },
+    pulsingPurple: { texture: 'enemyPulsingPurple',   health: 25, hardHealth: 30, score: 100, gem: 'gemMediumGold', gemXp: 35, elite: true,  damage: 15, radius: 19, burstOverride: 7, pulsing: true }
 };
 
 // Each entry: [scoreThreshold, [[cumProb, type], ...]]

@@ -11,6 +11,7 @@ class IntroScene extends Phaser.Scene {
         this.selectedShape = 0;
         this.selectedColor = 4; // Blue by default
         this.selectedEngineColor = 1; // Orange by default
+        this.selectedWeapon = 0; // Default weapon
 
         // Colors array
         this.colors = [
@@ -164,6 +165,46 @@ class IntroScene extends Phaser.Scene {
             this.updateShipPreview();
         });
 
+        // ===== ROW 4: WEAPON SELECTION (below preview) =====
+        const row4Y = boxY + arrowSpacing * 2;
+
+        // Label on far left
+        this.add.text(boxX - boxSize/2 - 160, row4Y, 'Weapon', {
+            fontSize: '18px',
+            fill: '#888888',
+            fontFamily: 'Arial'
+        }).setOrigin(0, 0.5);
+
+        // Weapon name text (centered between arrows)
+        this.weaponNameText = this.add.text(boxX, row4Y, WEAPON_DEFS[this.selectedWeapon].name, {
+            fontSize: '20px',
+            fill: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Left arrow
+        const leftWeaponArrow = this.add.text(boxX - boxSize/2 - 30, row4Y, '<', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        // Right arrow
+        const rightWeaponArrow = this.add.text(boxX + boxSize/2 + 30, row4Y, '>', {
+            fontSize: '32px',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        leftWeaponArrow.on('pointerdown', () => {
+            this.selectedWeapon = (this.selectedWeapon - 1 + WEAPON_DEFS.length) % WEAPON_DEFS.length;
+            this.weaponNameText.setText(WEAPON_DEFS[this.selectedWeapon].name);
+        });
+
+        rightWeaponArrow.on('pointerdown', () => {
+            this.selectedWeapon = (this.selectedWeapon + 1) % WEAPON_DEFS.length;
+            this.weaponNameText.setText(WEAPON_DEFS[this.selectedWeapon].name);
+        });
+
         // ===== DIFFICULTY SELECTION =====
         this.add.text(this.gameWidth / 2, 480, 'Select Difficulty', {
             fontSize: '20px',
@@ -248,11 +289,12 @@ class IntroScene extends Phaser.Scene {
     startGame(mode) {
         this.cameras.main.fade(500, 0, 0, 0);
         this.time.delayedCall(500, () => {
-            this.scene.start('GameScene', { 
+            this.scene.start('GameScene', {
                 gameMode: mode,
                 shipShape: this.selectedShape,
                 shipColor: this.colors[this.selectedColor].hex,
-                engineColor: this.colors[this.selectedEngineColor].hex
+                engineColor: this.colors[this.selectedEngineColor].hex,
+                weaponType: this.selectedWeapon
             });
         });
     }

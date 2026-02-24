@@ -9,6 +9,7 @@ class GameScene extends Phaser.Scene {
         this.shipShape = data.shipShape || 0;
         this.shipColor = data.shipColor || 0x00aaff;
         this.engineColor = data.engineColor || 0xff6600;
+        this.weaponType = data.weaponType || 0;
         this.score = 0;
         this.health = 100;
         this.maxHealth = 100;
@@ -45,7 +46,7 @@ class GameScene extends Phaser.Scene {
         
         // Shooting cooldowns
         this.lastShotTime = 0;
-        this.shootCooldown = 300;
+        this.shootCooldown = WEAPON_DEFS[this.weaponType].baseCooldown;
         
         // Enemy spawn timers
         this.lastEnemySpawn = 0;
@@ -141,6 +142,7 @@ class GameScene extends Phaser.Scene {
             classType: Phaser.Physics.Arcade.Image,
             maxSize: 100
         });
+        this.waveBullets = new Map();
 
         this.enemies = this.physics.add.group();
         this.asteroids = this.physics.add.group();
@@ -535,6 +537,10 @@ class GameScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-THREE', () => this.selectUpgrade(2));
     }
 
+    getGameTime() {
+        return this.time.now - (this.pauseTimeOffset || 0);
+    }
+
     update(time, delta) {
         // Handle game over - skip game logic but keep enemies moving
         if (this.isGameOver) {
@@ -657,7 +663,7 @@ class GameScene extends Phaser.Scene {
         // Update clones
         this.updateClones();
 
-        this.updateGarlicAura(time);
+        this.updateGarlicAura();
 
         // Spawn enemies
         if (time > this.lastEnemySpawn + this.enemySpawnRate) {
@@ -683,7 +689,7 @@ class GameScene extends Phaser.Scene {
             if (enemy && enemy.active) {
                 // Elite enemies shoot in bursts
                 if (enemy.isElite) {
-                    const now = this.time.now;
+                    const now = this.getGameTime();
                     const bulletsPerBurst = enemy.bulletsPerBurst || 3;
                     
                     if (enemy.isBurstShooting) {
@@ -691,7 +697,7 @@ class GameScene extends Phaser.Scene {
                         if (enemy.burstCount < bulletsPerBurst && now >= enemy.nextBurstShot) {
                             this.enemyShoot(enemy);
                             enemy.burstCount++;
-                            enemy.nextBurstShot = now + 200; // 200ms between burst shots
+                            enemy.nextBurstShot = now + (enemy.enemyType === 'pulsingPurple' ? 300 : 200);
                         } else if (enemy.burstCount >= bulletsPerBurst) {
                             // Burst complete, wait for next burst
                             enemy.isBurstShooting = false;
@@ -717,9 +723,12 @@ class GameScene extends Phaser.Scene {
         // Boss AI
         this.boss.children.iterate((boss) => {
             if (boss && boss.active) {
-                // Boss shoots multiple bullets
-                if (Phaser.Math.Between(0, 60) === 0) {
+                // Boss shoots once per second
+                const now = this.getGameTime();
+                if (!boss.lastShotTime) boss.lastShotTime = now;
+                if (now >= boss.lastShotTime + 1000) {
                     this.bossShoot(boss);
+                    boss.lastShotTime = now;
                 }
                 
                 // Boss moves side to side using velocity (not time-based position)
@@ -729,7 +738,7 @@ class GameScene extends Phaser.Scene {
                 
                 // Scale amplitude with boss count (150 base, +50 per boss, capped at screen bounds)
                 const baseAmplitude = 150;
-                const amplitudeIncrement = 50;
+                const amplitudeIncrement = 75;
                 const maxAmplitude = (this.gameWidth / 2) - 40; // Keep boss fully on screen
                 const amplitude = Math.min(baseAmplitude + (this.bossCount - 1) * amplitudeIncrement, maxAmplitude);
                 
@@ -805,7 +814,7 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    updateGarlicAura(time) {
+    updateGarlicAura() {
         if (this.upgrades.garlic <= 0 || !this.player.active) {
             if (this.garlicAura) {
                 this.garlicAura.destroy();
@@ -823,7 +832,8 @@ class GameScene extends Phaser.Scene {
             this.garlicAura.setRadius(auraRadius);
         }
 
-        if (time - this.garlicLastDamageTime > 500) {
+        const gameTime = this.getGameTime();
+        if (gameTime - this.garlicLastDamageTime > 500) {
             const damageInRange = (group, onKill) => {
                 group.children.iterate((target) => {
                     if (!target || !target.active) return;
@@ -839,7 +849,7 @@ class GameScene extends Phaser.Scene {
             damageInRange(this.enemies, (e) => this.destroyEnemy(e));
             damageInRange(this.asteroids, (a) => this.destroyAsteroid(a, false, null));
             damageInRange(this.boss, (b) => this.destroyBoss(b));
-            this.garlicLastDamageTime = time;
+            this.garlicLastDamageTime = gameTime;
         }
     }
 
@@ -951,37 +961,46 @@ class GameScene extends Phaser.Scene {
         const x = this.player.x;
         const y = this.player.y - 20;
         const damageMult = this.getDamageMultiplier();
+        const weapon = WEAPON_DEFS[this.weaponType];
 
-        if (this.multiShotActive) {
-            // 3-way spread shot
-            const bulletOffsets = [-25, 0, 25];
-            const xVelocities = [-100, 0, 100];
-            
-            for (let i = 0; i < 3; i++) {
-                this.createBullet(x + bulletOffsets[i], y, xVelocities[i], -500, damageMult);
-            }
-        } else {
-            // Single shot
-            this.createBullet(x, y, 0, -500, damageMult);
-        }
-        
-        // Clone shots - clones copy player's temp upgrades
+        // Fire weapon from player position(s)
+        this.fireWeaponPattern(x, y, damageMult, weapon);
+
+        // Clone shots - clones copy player's weapon and temp upgrades
         this.clones.children.iterate((clone) => {
             if (clone && clone.active) {
-                if (this.multiShotActive) {
-                    // 3-way spread shot
-                    const bulletOffsets = [-25, 0, 25];
-                    const xVelocities = [-100, 0, 100];
-                    
-                    for (let i = 0; i < 3; i++) {
-                        this.createBullet(clone.x + bulletOffsets[i], clone.y - 20, xVelocities[i], -500, damageMult);
-                    }
-                } else {
-                    // Single shot
-                    this.createBullet(clone.x, clone.y - 20, 0, -500, damageMult);
-                }
+                this.fireWeaponPattern(clone.x, clone.y - 20, damageMult, weapon);
             }
         });
+    }
+
+    fireWeaponPattern(x, y, damageMult, weapon) {
+        // Determine fire positions (single or multi-shot powerup)
+        let firePositions;
+        if (this.multiShotActive) {
+            firePositions = [
+                { x: x - 25, vxBase: -100 },
+                { x: x,      vxBase: 0 },
+                { x: x + 25, vxBase: 100 },
+            ];
+        } else {
+            firePositions = [{ x: x, vxBase: 0 }];
+        }
+
+        // Fire weapon pattern from each position
+        for (const pos of firePositions) {
+            if (weapon.spread) {
+                for (const s of weapon.spread) {
+                    this.createBullet(
+                        pos.x + s.xOffset, y,
+                        pos.vxBase + s.vx, -weapon.bulletSpeed,
+                        damageMult
+                    );
+                }
+            } else {
+                this.createBullet(pos.x, y, pos.vxBase, -weapon.bulletSpeed, damageMult);
+            }
+        }
     }
     
     createBullet(x, y, vx, vy, damageMult = 1) {
@@ -998,6 +1017,15 @@ class GameScene extends Phaser.Scene {
             bullet.chainLightning = this.upgrades.lightning > 0; // Has chain lightning
             bullet.lightningJumps = 1 + (this.upgrades.lightning * 2); // 3, 5, or 7 jumps
             bullet.lightningRange = 150 + (this.upgrades.lightning * 50); // 200, 250, or 300
+
+            // Weapon range limit
+            const weapon = WEAPON_DEFS[this.weaponType];
+            if (weapon.maxRange) {
+                bullet.spawnY = y;
+                bullet.maxRange = weapon.maxRange;
+            } else {
+                bullet.maxRange = 0;
+            }
         }
     }
     
@@ -1127,7 +1155,7 @@ class GameScene extends Phaser.Scene {
         const enemiesToDestroy = this.enemies.getChildren().filter(e => e && e.active);
         enemiesToDestroy.forEach((enemy) => {
             this.createExplosion(enemy.x, enemy.y);
-            this.spawnGem(enemy.x, enemy.y, enemy.isElite ? 'medium' : 'small');
+            this.spawnGem(enemy.x, enemy.y, enemy.gemType, enemy.gemXp);
             enemy.destroy();
         });
         
@@ -1199,14 +1227,15 @@ class GameScene extends Phaser.Scene {
         enemy.maxHealth = enemy.health;
         enemy.scoreValue = def.score;
         enemy.gemType = def.gem;
+        enemy.gemXp = def.gemXp;
         enemy.isElite = def.elite;
         if (def.damage) enemy.bulletDamage = def.damage;
         if (def.burstOverride) enemy.bulletsPerBurst = def.burstOverride;
-        if (typeName === 'darkPurple') enemy.enemyType = 'darkPurple';
+        enemy.enemyType = typeName;
         enemy.body.setCircle(def.radius);
         if (def.pulsing) this.addPulsingAnimation(enemy);
 
-        enemy.lastShotTime = this.time.now + 2000;
+        enemy.lastShotTime = this.getGameTime() + 2000;
         enemy.isBurstShooting = false;
         enemy.burstCount = 0;
 
@@ -1304,25 +1333,15 @@ class GameScene extends Phaser.Scene {
         }
     }
     
-    spawnGem(x, y, type) {
-        let gem;
-        let xpValue;
-        
-        switch(type) {
-            case 'small':
-                gem = this.gems.create(x, y, 'gemSmall');
-                xpValue = 5;
-                break;
-            case 'medium':
-                gem = this.gems.create(x, y, 'gemMedium');
-                xpValue = 25;
-                break;
-            case 'large':
-                gem = this.gems.create(x, y, 'gemLarge');
-                xpValue = 100;
-                break;
-        }
-        
+    spawnGem(x, y, type, xpOverride) {
+        // type can be a texture key (e.g. 'gemSmallGreen') or legacy name ('small','medium','large')
+        let textureKey = type;
+        let xpValue = xpOverride;
+        if (type === 'small')  { textureKey = 'gemSmall';  xpValue = xpValue || 5; }
+        if (type === 'medium') { textureKey = 'gemMedium';  xpValue = xpValue || 25; }
+        if (type === 'large')  { textureKey = 'gemLarge';   xpValue = xpValue || 100; }
+
+        const gem = this.gems.create(x, y, textureKey);
         if (gem) {
             gem.xpValue = xpValue;
             gem.setVelocity(Phaser.Math.Between(-20, 20), Phaser.Math.Between(50, 100));
@@ -1515,7 +1534,9 @@ class GameScene extends Phaser.Scene {
             
             // Resume game
             this.isPaused = false;
-            this.pauseTimeOffset += this.time.now - this.lastPauseTime;
+            const pauseDuration = this.time.now - this.lastPauseTime;
+            this.pauseTimeOffset += pauseDuration;
+
             this.physics.world.resume();
             return;
         }
@@ -1554,7 +1575,8 @@ class GameScene extends Phaser.Scene {
         
         // Resume game
         this.isPaused = false;
-        this.pauseTimeOffset += this.time.now - this.lastPauseTime;
+        const pauseDuration = this.time.now - this.lastPauseTime;
+        this.pauseTimeOffset += pauseDuration;
         this.physics.world.resume();
     }
     
@@ -1602,20 +1624,9 @@ class GameScene extends Phaser.Scene {
             this.pauseText.setVisible(true);
         } else {
             // Track accumulated pause time
-            const pauseDuration = this.time.now - this.lastPauseTime;
-            this.pauseTimeOffset += pauseDuration;
-            
-            // Adjust powerup expire times to account for paused time
-            if (this.rapidFireExpireTime > 0) {
-                this.rapidFireExpireTime += pauseDuration;
-            }
-            if (this.multiShotExpireTime > 0) {
-                this.multiShotExpireTime += pauseDuration;
-            }
-            if (this.lasersExpireTime > 0) {
-                this.lasersExpireTime += pauseDuration;
-            }
-            
+            this.pauseTimeOffset += this.time.now - this.lastPauseTime;
+
+
             this.physics.world.resume();
             if (this.pauseText) {
                 this.pauseText.setVisible(false);
@@ -1624,16 +1635,17 @@ class GameScene extends Phaser.Scene {
     }
 
     enemyShoot(enemy) {
-        // Dark purple shoots 2-bullet spread instead of single angled shot
+        // Dark purple shoots 2-bullet spread
         if (enemy.enemyType === 'darkPurple') {
-            for (let i = -1; i <= 1; i++) {
-                const bullet = this.enemyBullets.get(enemy.x + i * 20, enemy.y + 20, 'enemyBullet');
+            for (const i of [-1, 1]) {
+                const bullet = this.enemyBullets.get(enemy.x, enemy.y + 20, 'enemyBullet');
                 if (bullet) {
                     bullet.setActive(true);
                     bullet.setVisible(true);
-                    bullet.setVelocityY(300);
-                    bullet.setVelocityX(i * 50);
+                    bullet.body.reset(enemy.x, enemy.y + 20);
+                    bullet.setVelocity(enemy.body.velocity.x + i * 80, 300);
                     bullet.damage = enemy.bulletDamage;
+                    bullet.isZigzag = false;
                 }
             }
         } else {
@@ -1641,24 +1653,16 @@ class GameScene extends Phaser.Scene {
             if (bullet) {
                 bullet.setActive(true);
                 bullet.setVisible(true);
-                bullet.setVelocityY(300);
-                
-                // Light Purple shoots straight, Dark Purple aims more aggressively
-                if (enemy.bulletDamage === 8) {
-                    bullet.setVelocityX(0);
-                } else if (enemy.bulletDamage === 12) {
-                    bullet.setVelocityX((this.player.x - enemy.x) / 5);
-                } else {
-                    bullet.setVelocityX((this.player.x - enemy.x) / 10);
-                }
-                
+                bullet.body.reset(enemy.x, enemy.y + 20);
                 bullet.damage = enemy.bulletDamage || 10;
-                
-                // Pulsing purple bullets have zigzag movement
-                if (enemy.bulletsPerBurst === 5) {
-                    bullet.zigzagPhase = 0;
-                    bullet.zigzagStartX = enemy.x;
-                    bullet.isZigzag = true;
+
+                // Pulsing purple: wave pattern
+                if (enemy.enemyType === 'pulsingPurple') {
+                    bullet.setVelocity(0, 250);
+                    this.waveBullets.set(bullet, { startX: enemy.x, phase: 0 });
+                } else {
+                    bullet.setVelocity(0, 300);
+                    this.waveBullets.delete(bullet);
                 }
             }
         }
@@ -1726,7 +1730,7 @@ class GameScene extends Phaser.Scene {
         
         // Spawn gem
         if (enemy.gemType) {
-            this.spawnGem(enemy.x, enemy.y, enemy.gemType);
+            this.spawnGem(enemy.x, enemy.y, enemy.gemType, enemy.gemXp);
         }
         
         // Spawn powerup chance
@@ -1954,8 +1958,8 @@ class GameScene extends Phaser.Scene {
 
     collectPowerup(player, powerup) {
         const type = powerup.powerupType;
-        const currentTime = this.time.now;
-        
+        const currentTime = this.getGameTime();
+
         switch (type) {
             case 'powerupShield':
                 this.shieldActive = true;
@@ -1970,13 +1974,13 @@ class GameScene extends Phaser.Scene {
                 break;
             case 'powerupRapid':
                 this.rapidFireActive = true;
-                this.shootCooldown = 150;
+                this.shootCooldown = WEAPON_DEFS[this.weaponType].rapidFireCooldown;
                 this.rapidFireExpireTime = currentTime + 10000;
                 this.showMessage('RAPID FIRE', '#ffff00');
                 if (this.rapidFireTimer) this.rapidFireTimer.remove();
                 this.rapidFireTimer = this.time.delayedCall(10000, () => {
                     this.rapidFireActive = false;
-        this.shootCooldown = 350;
+                    this.shootCooldown = WEAPON_DEFS[this.weaponType].baseCooldown;
                     this.rapidFireTimer = null;
                 });
                 break;
@@ -2434,7 +2438,7 @@ class GameScene extends Phaser.Scene {
         this.rapidFireExpireTime = 0;
         this.multiShotExpireTime = 0;
         this.lasersExpireTime = 0;
-        this.shootCooldown = 350;
+        this.shootCooldown = WEAPON_DEFS[this.weaponType].baseCooldown;
 
         // Cleanup lasers
         this.lasersActive = false;
@@ -2463,26 +2467,32 @@ class GameScene extends Phaser.Scene {
     cleanupObjects() {
         // Clean up bullets
         this.bullets.children.iterate((bullet) => {
-            if (bullet && bullet.active && (bullet.y < -10 || bullet.y > this.gameHeight + 10)) {
-                bullet.setActive(false);
-                bullet.setVisible(false);
+            if (bullet && bullet.active) {
+                if (bullet.y < -10 || bullet.y > this.gameHeight + 10) {
+                    bullet.setActive(false);
+                    bullet.setVisible(false);
+                } else if (bullet.maxRange > 0 && Math.abs(bullet.y - bullet.spawnY) >= bullet.maxRange) {
+                    bullet.setActive(false);
+                    bullet.setVisible(false);
+                }
             }
         });
 
         // Clean up enemy bullets
         this.enemyBullets.children.iterate((bullet) => {
             if (bullet && bullet.active) {
-                // Pulsing purple bullets zigzag in S-shape
-                if (bullet.isZigzag && !bullet.isBossBullet) {
-                    bullet.zigzagPhase = (bullet.zigzagPhase || 0) + 0.1;
-                    const zigzagAmplitude = 50;
-                    const zigzagX = Math.sin(bullet.zigzagPhase) * zigzagAmplitude;
-                    bullet.setVelocityX(zigzagX);
+                // Pulsing purple bullets wave in sin pattern
+                const wave = this.waveBullets.get(bullet);
+                if (wave) {
+                    wave.phase += this.game.loop.delta * 0.008;
+                    bullet.x = wave.startX + Math.sin(wave.phase) * 120;
+                    bullet.body.velocity.x = 0;
                 }
-                
+
                 if (bullet.y < -10 || bullet.y > this.gameHeight + 10) {
                     bullet.setActive(false);
                     bullet.setVisible(false);
+                    this.waveBullets.delete(bullet);
                 }
             }
         });
@@ -2525,7 +2535,7 @@ class GameScene extends Phaser.Scene {
         }
         
         // Active powerups with countdown timers
-        const currentTime = this.time.now;
+        const currentTime = this.getGameTime();
         
         if (this.rapidFireActive) {
             const rapidTimeLeft = Math.ceil((this.rapidFireExpireTime - currentTime) / 1000);
